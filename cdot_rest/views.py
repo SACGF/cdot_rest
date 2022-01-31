@@ -18,8 +18,13 @@ def index(request):
 
 
 def transcript(request, transcript_version):
+    # I don't think there's much point caching this as it just fetches it out of Redis anyway
     r = redis.Redis(**settings.REDIS_KWARGS)
     data = r.get(transcript_version)
     if data is None:
         raise Http404(transcript_version + " not found")
-    return HttpResponse(data, content_type='application/json')
+
+    max_age = getattr(settings, 'CACHE_CONTROL_MAX_AGE', 2592000)
+    response = HttpResponse(data, content_type='application/json')
+    response['Cache-Control'] = 'max-age=%d' % max_age
+    return response
