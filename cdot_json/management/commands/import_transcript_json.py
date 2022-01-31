@@ -1,10 +1,11 @@
+import json
 import logging
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
 import gzip
-import json
+import ijson
 import redis
 
 
@@ -24,22 +25,19 @@ class Command(BaseCommand):
 
         r = redis.Redis(**settings.REDIS_KWARGS)
         with gzip.open(options["cdot_json"]) as f:
-            logging.info("Loading cdot JSON...")
-            data = json.load(f)
-            # TODO: Checks
-
-            # Need to values to strings
-            transcripts = data["transcripts"]
+            logging.info("Reading cdot JSON...")
+            # Loading it all into RAM via json was killed from lack of memory on a 4gig server, so using ijson
 
             mapping = {}
-            logging.info("Converting data")
-            for transcript_id, transcript in transcripts.items():
+            num_transcripts = 0
+            for transcript_id, transcript in ijson.kvitems(f, 'transcripts'):
                 mapping[transcript_id] = json.dumps(transcript)
+                num_transcripts += 1
 
             logging.info("Inserting into to Redis...")
             r.mset(mapping)
 
             # Store eg "refseq_count" or "ensembl_count"
             key = annotation_consortium.lower() + "_count"
-            r.set(key, len(transcripts))
+            r.set(key, num_transcripts)
 
