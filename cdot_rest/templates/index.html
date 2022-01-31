@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>cdot: HGVS Transcript REST API</title>
+  </head>
+  <body>
+    <h3>cdot.cc - HGVS Transcript REST API</h3>
+    <p>
+        This server hosts {{ total_count }} transcript versions, to resolve HGVS.
+    </p>
+
+    <div>
+        Examples:
+
+        <table>
+            <tr>
+                <th>RefSeq</th>
+                <td>{{ refseq_count|default_if_none:'No' }} transcripts</td>
+                <td>
+                    <a href="{% url 'transcript' "NM_001001890.3" %}">Example NM_001001890.3</a>
+                </td>
+            </tr>
+            <tr>
+                <th>Ensembl</th>
+                <td>{{ ensembl_count|default_if_none:'No' }} transcripts</td>
+                <td>
+                    <a href="{% url 'transcript' "ENST00000344691.8" %}">Example ENST00000344691.8</a>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <div>
+        <a href="https://github.com/SACGF/cdot">cdot</a>
+        <a href="https://github.com/SACGF/cdot_rest">cdot_rest</a>
+    </div>
+
+  </body>
+</html>
