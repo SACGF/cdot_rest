@@ -12,18 +12,15 @@ https://docs.djangoproject.com/en/4.0/ref/settings/
 
 from pathlib import Path
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
+from cdot_rest.django_secret_key import get_or_create_django_secret_key
 
+THIS_DIR = Path(__file__).resolve().parent
+BASE_DIR = THIS_DIR.parent
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/4.0/howto/deployment/checklist/
-
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-)q_b7c!#jz9bdxhaki4m!4n&+(i!d%5b16flf+77a8r^6i6!!v'
+SECRET_KEY = get_or_create_django_secret_key(THIS_DIR)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = ["cdot.cc", "203.101.229.44", "localhost"]
 
@@ -59,7 +56,9 @@ LOGGING = {
 }
 
 MIDDLEWARE = [
+    'django.middleware.security.SecurityMiddleware',
     'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
@@ -91,6 +90,7 @@ DATABASES = {
     # No database
 }
 
+CSRF_COOKIE_SECURE = True
 
 # Internationalization
 # https://docs.djangoproject.com/en/4.0/topics/i18n/
