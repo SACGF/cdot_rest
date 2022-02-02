@@ -65,6 +65,7 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'cdot_rest.urls'
 
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -74,7 +75,7 @@ TEMPLATES = [
             'context_processors': [
                 'django.template.context_processors.debug',
                 'django.template.context_processors.request',
-                'django.contrib.messages.context_processors.messages',
+                'django.template.context_processors.static',
             ],
         },
     },
@@ -112,7 +113,14 @@ REDIS_KWARGS = {
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.0/howto/static-files/
 
+STATIC_ROOT = BASE_DIR / "cdot_rest" / "sitestatic" / "static"
 STATIC_URL = 'static/'
+STATICFILES_STORAGE = "django.contrib.staticfiles.storage.ManifestStaticFilesStorage"
+
+STATICFILES_DIRS = (
+    # Absolute paths
+    BASE_DIR / "cdot_rest" / "static",
+)
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.0/ref/settings/#default-auto-field
