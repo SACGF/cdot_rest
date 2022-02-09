@@ -13,7 +13,7 @@
                 <div class="container-fluid py-5">
                 <h1 class="display-5 fw-bold">cdot.cc</h1>
                 <p class="text-muted">HGVS Transcript REST API</p>
-                <p class="col-md-8 fs-4">This server hosts 801,653 transcript versions to resolve HGVS.</p>
+                <p class="col-md-8 fs-4">This server hosts {{ total_count }} transcript versions to resolve HGVS.</p>
             </div>
         </div>
 
@@ -24,10 +24,10 @@
                     <h4 class="my-0 fw-normal">RefSeq</h4>
                 </div>
                 <div class="card-body">
-                    <h1 class="card-title">414,579 <small class="text-muted fw-light">transcripts</small></h1>
+                    <h1 class="card-title">{{ refseq_count|default_if_none:'No' }} <small class="text-muted fw-light">transcripts</small></h1>
                     <ul class="list-unstyled mt-3 mb-4">
                     <li>Examples</li>
-                    <li><a href="https://cdot.cc/transcript/NM_001001890.3">NM_001001890.3</a></li>
+                    <li><a href="{% url 'transcript' "NM_001001890.3" %}">NM_001001890.3</a></li>
                     </ul>
                 </div>
                 </div>
@@ -38,10 +38,10 @@
                     <h4 class="my-0 fw-normal">Ensembl</h4>
                 </div>
                 <div class="card-body">
-                    <h1 class="card-title">387,074 <small class="text-muted fw-light">transcripts</small></h1>
+                    <h1 class="card-title">{{ ensembl_count|default_if_none:'No' }} <small class="text-muted fw-light">transcripts</small></h1>
                     <ul class="list-unstyled mt-3 mb-4">
                     <li>Examples</li>
-                    <li><a href="https://cdot.cc/transcript/ENST00000344691.8">ENST00000344691.8</a></li>
+                    <li><a href="{% url 'transcript' "ENST00000344691.8" %}">ENST00000344691.8</a></li>
                     </ul>
                 </div>
                 </div>
