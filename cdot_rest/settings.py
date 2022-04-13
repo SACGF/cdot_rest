@@ -30,6 +30,7 @@ ALLOWED_HOSTS = ["cdot.cc", "203.101.229.44", "localhost"]
 INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.staticfiles',
+    'django.contrib.humanize',
     'cdot_json',  # Need to make an app to have management command
 ]
 

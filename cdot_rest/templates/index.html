@@ -1,3 +1,4 @@
+{% load humanize %}
 <!DOCTYPE html>
 <html lang="en">
     <head>
@@ -13,18 +14,23 @@
                 <div class="container-fluid py-5">
                 <h1 class="display-5 fw-bold">cdot.cc</h1>
                 <p class="text-muted">HGVS Transcript REST API</p>
-                <p class="col-md-8 fs-4">This server hosts {{ total_count }} transcript versions to resolve HGVS.</p>
+                {% if total_count %}
+                <p class="col-md-8 fs-4">This server hosts {{ total_count|intcomma }} transcript versions to resolve HGVS.</p>
+                {% else %}
+                <p class="col-md-8 fs-4">This server has no transcripts (need to run the 'import_transcript_json' command)</p>
+                {% endif %}
             </div>
         </div>
 
         <div class="row row-cols-1 row-cols-md-2 mb-3 text-center">
+            {% if refseq_count %}
             <div class="col">
                 <div class="card mb-6 rounded-3 shadow-sm">
                 <div class="card-header py-3">
                     <h4 class="my-0 fw-normal">RefSeq</h4>
                 </div>
                 <div class="card-body">
-                    <h1 class="card-title">{{ refseq_count|default_if_none:'No' }} <small class="text-muted fw-light">transcripts</small></h1>
+                    <h1 class="card-title">{{ refseq_count|intcomma }} <small class="text-muted fw-light">transcripts</small></h1>
                     <ul class="list-unstyled mt-3 mb-4">
                     <li>Examples</li>
                     <li><a href="{% url 'transcript' "NM_001001890.3" %}">NM_001001890.3</a></li>
@@ -32,13 +38,15 @@
                 </div>
                 </div>
             </div>
+            {% endif %}
+            {% if ensembl_count %}
             <div class="col">
                 <div class="card mb-6 rounded-3 shadow-sm">
                 <div class="card-header py-3">
                     <h4 class="my-0 fw-normal">Ensembl</h4>
                 </div>
                 <div class="card-body">
-                    <h1 class="card-title">{{ ensembl_count|default_if_none:'No' }} <small class="text-muted fw-light">transcripts</small></h1>
+                    <h1 class="card-title">{{ ensembl_count|intcomma }} <small class="text-muted fw-light">transcripts</small></h1>
                     <ul class="list-unstyled mt-3 mb-4">
                     <li>Examples</li>
                     <li><a href="{% url 'transcript' "ENST00000344691.8" %}">ENST00000344691.8</a></li>
@@ -46,6 +54,7 @@
                 </div>
                 </div>
             </div>
+            {% endif %}
         </div>
         <p class="text-info">GitHub : <a href="https://github.com/SACGF/cdot">cdot</a> | <a href="https://github.com/SACGF/cdot_rest">cdot REST</a></p>
 
