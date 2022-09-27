@@ -51,12 +51,12 @@ def transcript(request, transcript_version):
 @cache_page(DAY_SECONDS)
 def transcripts_for_gene(request, gene_symbol):
     rdp = RedisDataProvider(_get_redis())
-    data = {"transcripts": rdp.get_tx_for_gene(gene_symbol)}
+    data = {"results": rdp.get_tx_for_gene(gene_symbol)}
     return JsonResponse(data)
 
 
 @cache_page(DAY_SECONDS)
 def transcripts_for_region(request, contig, aln_method, start, end):
     rdp = RedisDataProvider(_get_redis())
-    data = {"transcripts": rdp.get_tx_for_region(contig, aln_method, start, end)}
+    data = {"results": rdp.get_tx_for_region(contig, aln_method, start, end)}
     return JsonResponse(data)
