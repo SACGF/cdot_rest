@@ -9,4 +9,8 @@ from cdot_rest import views
 urlpatterns = [
     path('', views.index, name='index'),
     path('transcript/<transcript_version>', views.transcript, name='transcript'),
+    path('transcripts/gene/<gene_symbol>', views.transcripts_for_gene,
+         name='transcripts_for_gene'),
+    path('transcripts/region/<contig>/<aln_method>/<int:start>/<int:end>', views.transcripts_for_region,
+         name='transcripts_for_region'),
 ]
