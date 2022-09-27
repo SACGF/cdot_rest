@@ -50,8 +50,8 @@ class Command(BaseCommand):
             f.seek(0)
             genes_data = {}
             for gene_id, gene in ijson.kvitems(f, 'genes'):
-                gene_symbol = gene["gene_symbol"]
-                genes_data[gene_symbol] = json.dumps(gene)
+                if gene_symbol := gene["gene_symbol"]:
+                    genes_data[gene_symbol] = json.dumps(gene)
             r.mset(genes_data)
             del genes_data
 
