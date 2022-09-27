@@ -29,25 +29,35 @@ class Command(BaseCommand):
             logging.info("Reading cdot JSON...")
             # Loading it all into RAM via json was killed from lack of memory on a 4gig server, so using ijson
 
-            mapping = {}
+            transcripts_data = {}
             # Make this an iterator so that we can pass it and it also does work for us
             def transcripts_iter():
                 for transcript_id, transcript in ijson.kvitems(f, 'transcripts'):
-                    mapping[transcript_id] = json.dumps(transcript)
+                    transcripts_data[transcript_id] = json.dumps(transcript)
                     yield transcript_id, transcript
 
             tx_by_gene, tx_intervals = LocalDataProvider._get_tx_by_gene_and_intervals(transcripts_iter())
 
             logging.info("Inserting into to Redis...")
-            r.mset(mapping)
+            r.mset(transcripts_data)
 
             # Store eg "refseq_count" or "ensembl_count"
             key = annotation_consortium.lower() + "_count"
-            r.set(key, len(mapping))
+            r.set(key, len(transcripts_data))
+            del transcripts_data
+
+            logging.info("Adding gene data")
+            f.seek(0)
+            genes_data = {}
+            for gene_id, gene in ijson.kvitems(f, 'genes'):
+                gene_symbol = gene["gene_symbol"]
+                genes_data[gene_symbol] = json.dumps(gene)
+            r.mset(genes_data)
+            del genes_data
 
             logging.info("Adding transcripts for gene names")
             for gene_name, transcript_set in tx_by_gene.items():
-                r.sadd(gene_name, *tuple(transcript_set))
+                r.sadd(f"transcripts:{gene_name}", *tuple(transcript_set))
 
             logging.info("Adding transcript interval trees")
             for contig, iv_tree in tx_intervals.items():

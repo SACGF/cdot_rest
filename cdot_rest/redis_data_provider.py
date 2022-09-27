@@ -24,5 +24,11 @@ class RedisDataProvider(LocalDataProvider):
             transcript = json.loads(t_str)
         return transcript
 
+    def _get_gene(self, gene):
+        gene_data = None
+        if g_str := self.redis.get(gene):
+            gene_data = json.loads(g_str)
+        return gene_data
+
     def _get_transcript_ids_for_gene(self, gene):
-        return [decode(x) for x in self.redis.smembers(gene)]
+        return [decode(x) for x in self.redis.smembers(f"transcripts:{gene}")]

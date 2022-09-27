@@ -29,6 +29,16 @@ def index(request):
 
 
 @cache_page(DAY_SECONDS)
+def gene(request, gene_symbol):
+    r = _get_redis()
+    data = r.get(gene_symbol)
+    if data is None:
+        raise Http404(gene_symbol + " not found")
+
+    return HttpResponse(data, content_type='application/json')
+
+
+@cache_page(DAY_SECONDS)
 def transcript(request, transcript_version):
     r = _get_redis()
     data = r.get(transcript_version)
@@ -42,7 +52,6 @@ def transcript(request, transcript_version):
 def transcripts_for_gene(request, gene_symbol):
     rdp = RedisDataProvider(_get_redis())
     data = {"transcripts": rdp.get_tx_for_gene(gene_symbol)}
-    print(data)
     return JsonResponse(data)
 
 
