@@ -25,9 +25,11 @@ class Command(BaseCommand):
         annotation_help = "One of " + Command.VALID_ANNOTATION_CONSORTIUMS
         parser.add_argument('cdot_json', help='cdot json file')
         parser.add_argument('--annotation-consortium', required=True, help=annotation_help)
+        parser.add_argument('--cdot-data-version', required=True, help="Need to specify as using iterator to pull out json")
 
     def handle(self, *args, **options):
         annotation_consortium = options["annotation_consortium"]
+        cdot_data_version = options["cdot_data_version"]
         if annotation_consortium not in Command.ANNOTATION_CONSORTIUMS:
             raise ValueError("--annotation-consortium must be one of " + Command.VALID_ANNOTATION_CONSORTIUMS)
 
@@ -40,6 +42,7 @@ class Command(BaseCommand):
             # Make this an iterator so that we can pass it and it also does work for us
             def transcripts_iter():
                 for transcript_id, transcript in ijson.kvitems(f, 'transcripts'):
+                    transcript["cdot_data_version"] = cdot_data_version
                     transcripts_data[transcript_id] = json.dumps(transcript)
                     yield transcript_id, transcript
 
