@@ -7,7 +7,14 @@ import redis
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
+from itertools import islice
 from cdot.hgvs.dataproviders import LocalDataProvider
+
+
+def chunks(data, SIZE=10000):
+    it = iter(data)
+    for i in range(0, len(data), SIZE):
+        yield {k:data[k] for k in islice(it, SIZE)}
 
 
 class Command(BaseCommand):
@@ -39,7 +46,8 @@ class Command(BaseCommand):
             tx_by_gene, tx_intervals = LocalDataProvider._get_tx_by_gene_and_intervals(transcripts_iter())
 
             logging.info("Inserting into to Redis...")
-            r.mset(transcripts_data)
+            for td in chunks(transcripts_data):
+                r.mset(td)
 
             # Store eg "refseq_count" or "ensembl_count"
             key = annotation_consortium.lower() + "_count"
