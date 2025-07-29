@@ -3,7 +3,7 @@ import ijson
 import json
 import logging
 import pickle
-import redis
+from redis import Redis
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
@@ -34,7 +34,7 @@ class Command(BaseCommand):
 
 
     def handle(self, *args, **options):
-        r = redis.Redis(**settings.REDIS_KWARGS)
+        r = Redis(**settings.REDIS_KWARGS)
         subcommand = options["subcommand"]
         if subcommand == "cdot_json":
             annotation_consortium = options["annotation_consortium"]
