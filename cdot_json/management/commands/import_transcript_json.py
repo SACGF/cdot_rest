@@ -9,7 +9,7 @@ from redis import Redis
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from itertools import islice
-from cdot.data_release import get_latest_data_version_and_release
+from cdot.data_release import get_latest_browser_urls, get_latest_data_version_and_release
 from cdot.hgvs.dataproviders import LocalDataProvider
 
 
