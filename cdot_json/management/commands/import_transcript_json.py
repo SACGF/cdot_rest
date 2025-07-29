@@ -8,6 +8,7 @@ import redis
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from itertools import islice
+from cdot.data_release import get_latest_data_version_and_release
 from cdot.hgvs.dataproviders import LocalDataProvider
 
 
@@ -22,26 +23,49 @@ class Command(BaseCommand):
     VALID_ANNOTATION_CONSORTIUMS = ', '.join(["'%s" % a for a in ANNOTATION_CONSORTIUMS])
 
     def add_arguments(self, parser):
+        subparsers = parser.add_subparsers(dest='subcommand')
+        parser_file = subparsers.add_parser("cdot_json", help="Single cdot JSON file")
         annotation_help = "One of " + Command.VALID_ANNOTATION_CONSORTIUMS
-        parser.add_argument('cdot_json', help='cdot json file')
-        parser.add_argument('--annotation-consortium', required=True, help=annotation_help)
-        parser.add_argument('--cdot-data-version', required=True, help="Need to specify as using iterator to pull out json")
+        parser_file.add_argument('--annotation-consortium', required=True, help=annotation_help)
+        parser_file.add_argument('--cdot-data-version', required=True, help="Need to specify as using iterator to pull out json")
+        parser_file.add_argument('filename', required=True, help="cdot json.gz file")
+        # No extra params - handles automatically
+        _parser_latest = subparsers.add_parser("latest", help="Automatically retrieve latest from cdot GitHub")
+
 
     def handle(self, *args, **options):
-        annotation_consortium = options["annotation_consortium"]
-        cdot_data_version = options["cdot_data_version"]
-        if annotation_consortium not in Command.ANNOTATION_CONSORTIUMS:
-            raise ValueError("--annotation-consortium must be one of " + Command.VALID_ANNOTATION_CONSORTIUMS)
-
         r = redis.Redis(**settings.REDIS_KWARGS)
-        with gzip.open(options["cdot_json"]) as f:
+        subcommand = options["subcommand"]
+        if subcommand == "cdot_json":
+            annotation_consortium = options["annotation_consortium"]
+            cdot_data_version = options["cdot_data_version"]
+            if annotation_consortium not in Command.ANNOTATION_CONSORTIUMS:
+                raise ValueError("--annotation-consortium must be one of " + Command.VALID_ANNOTATION_CONSORTIUMS)
+
+            with gzip.open(options["filename"]) as cdot_json_file:
+                self._insert_transcripts(r, cdot_data_version, annotation_consortium, cdot_json_file)
+        elif subcommand == "latest":
+            cdot_data_version, _release = get_latest_data_version_and_release()
+            pattern = re.compile("cdot-\d+\.\d+\.\d+.all-builds-(ensembl|refseq)-.*.json.gz")
+
+            for browser_url in get_latest_browser_urls():
+                filename = browser_url.rsplit("/", maxsplit=1)[-1]
+                if m := pattern.match(filename):
+                    annotation_consortium = m.group(1)
+                    logging.info("Downloading annotation_consortium=%s, url=%s", annotation_consortium, browser_url)
+                    response = requests.get(browser_url, stream=True, timeout=60)
+                    with gzip.GzipFile(fileobj=response.raw) as cdot_json_file:
+                        self._insert_transcripts(r, cdot_data_version, annotation_consortium, cdot_json_file)
+
+
+    def _insert_transcripts(self, r: Redis, cdot_data_version, annotation_consortium, cdot_json_file):
             logging.info("Reading cdot JSON...")
             # Loading it all into RAM via json was killed from lack of memory on a 4gig server, so using ijson
 
             transcripts_data = {}
             # Make this an iterator so that we can pass it and it also does work for us
             def transcripts_iter():
-                for transcript_id, transcript in ijson.kvitems(f, 'transcripts'):
+                for transcript_id, transcript in ijson.kvitems(cdot_json_file, 'transcripts'):
                     transcript["cdot_data_version"] = cdot_data_version
                     transcripts_data[transcript_id] = json.dumps(transcript)
                     yield transcript_id, transcript
@@ -60,7 +84,7 @@ class Command(BaseCommand):
             logging.info("Adding gene data")
             f.seek(0)
             genes_data = {}
-            for gene_id, gene in ijson.kvitems(f, 'genes'):
+            for gene_id, gene in ijson.kvitems(cdot_json_file, 'genes'):
                 if gene_symbol := gene["gene_symbol"]:
                     genes_data[gene_symbol] = json.dumps(gene)
             r.mset(genes_data)
