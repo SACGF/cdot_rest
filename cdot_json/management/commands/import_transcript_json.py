@@ -1,4 +1,5 @@
 import gzip
+import io
 import ijson
 import json
 import logging
