@@ -55,8 +55,10 @@ class Command(BaseCommand):
                 if m := pattern.match(filename):
                     annotation_consortium = m.group(1)
                     logging.info("Downloading annotation_consortium=%s, url=%s", annotation_consortium, browser_url)
-                    response = requests.get(browser_url, stream=True, timeout=60)
-                    with gzip.GzipFile(fileobj=response.raw) as cdot_json_file:
+                    response = requests.get(browser_url, timeout=60)
+                    # Need to read into memory as we need to seek it
+                    fileobj = io.BytesIO(response.content)
+                    with gzip.GzipFile(fileobj=fileobj) as cdot_json_file:
                         self._insert_transcripts(r, cdot_data_version, annotation_consortium, cdot_json_file)
 
 
