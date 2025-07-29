@@ -2,6 +2,7 @@ import gzip
 import ijson
 import json
 import logging
+import re
 import pickle
 from redis import Redis
 
