@@ -84,7 +84,7 @@ class Command(BaseCommand):
             del transcripts_data
 
             logging.info("Adding gene data")
-            f.seek(0)
+            cdot_json_file.seek(0)
             genes_data = {}
             for gene_id, gene in ijson.kvitems(cdot_json_file, 'genes'):
                 if gene_symbol := gene["gene_symbol"]:
