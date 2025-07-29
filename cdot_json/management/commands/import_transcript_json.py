@@ -28,7 +28,7 @@ class Command(BaseCommand):
         annotation_help = "One of " + Command.VALID_ANNOTATION_CONSORTIUMS
         parser_file.add_argument('--annotation-consortium', required=True, help=annotation_help)
         parser_file.add_argument('--cdot-data-version', required=True, help="Need to specify as using iterator to pull out json")
-        parser_file.add_argument('filename', required=True, help="cdot json.gz file")
+        parser_file.add_argument('filename', help="cdot json.gz file")
         # No extra params - handles automatically
         _parser_latest = subparsers.add_parser("latest", help="Automatically retrieve latest from cdot GitHub")
 
