@@ -3,6 +3,7 @@ import ijson
 import json
 import logging
 import re
+import requests
 import pickle
 from redis import Redis
 
