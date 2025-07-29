@@ -48,7 +48,7 @@ class Command(BaseCommand):
                 self._insert_transcripts(r, cdot_data_version, annotation_consortium, cdot_json_file)
         elif subcommand == "latest":
             cdot_data_version, _release = get_latest_data_version_and_release()
-            pattern = re.compile("cdot-\d+\.\d+\.\d+.all-builds-(ensembl|refseq)-.*.json.gz")
+            pattern = re.compile(r"cdot-\d+\.\d+\.\d+.all-builds-(ensembl|refseq)-.*.json.gz")
 
             for browser_url in get_latest_browser_urls():
                 filename = browser_url.rsplit("/", maxsplit=1)[-1]
