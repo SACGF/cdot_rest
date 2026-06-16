@@ -90,10 +90,9 @@ if [ ! -e ${CDOT_REST_INSTALL_DIR}/.git ]; then
     git clone https://github.com/sacgf/cdot_rest.git .
 fi
 
-# Python libraries
+# Python libraries (gunicorn is included in requirements.txt)
 uv venv .venv
 source /opt/cdot_rest/.venv/bin/activate
-uv pip install gunicorn  # Into the venv so it picks up the libraries
 uv pip install -r requirements.txt
 ```
 

@@ -1,4 +1,5 @@
 Django
+gunicorn
 redis
 ijson
 # Pinned to git main: needs get_latest_browser_urls / get_latest_data_version_and_release,

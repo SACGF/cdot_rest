@@ -33,6 +33,8 @@ executing==2.2.1
     # via stack-data
 fakeredis==2.36.1
     # via -r requirements-test.in
+gunicorn==26.0.0
+    # via -r requirements.in
 hgvs==1.5.7
     # via cdot
 humanfriendly==10.0
@@ -61,6 +63,8 @@ more-itertools==11.1.0
     # via cdot
 msgspec==0.21.1
     # via cdot
+packaging==26.2
+    # via gunicorn
 parsley==1.3
     # via hgvs
 parso==0.8.7
