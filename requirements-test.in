@@ -1,3 +1,4 @@
 # Test-only dependencies. Install on top of requirements.txt.
 -r requirements.in
 fakeredis
+pyyaml

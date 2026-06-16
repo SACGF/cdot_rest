@@ -1,0 +1,386 @@
+openapi: 3.1.0
+info:
+  title: cdot REST API
+  version: "1.0"
+  description: |
+    REST API for [cdot](https://github.com/SACGF/cdot/) - historical RefSeq and Ensembl
+    transcripts (GRCh37/GRCh38) used to resolve [HGVS](http://varnomen.hgvs.org/).
+
+    All endpoints are public, read-only, and return JSON. Transcript and gene records follow
+    the [cdot data format](https://github.com/SACGF/cdot/).
+
+    ### Accessions and versions
+    A transcript accession may be **versioned** (`NM_000059.3`) or **versionless** (`NM_000059`).
+    RefSeq/Ensembl accessions contain no internal `.`, so the presence of a `.` is what marks an
+    explicit version. Versionless lookups expand to *all* stored versions of that accession.
+  contact:
+    name: cdot
+    url: https://github.com/SACGF/cdot_rest
+  license:
+    name: MIT
+    url: https://github.com/SACGF/cdot_rest/blob/main/LICENSE
+
+servers:
+  - url: https://cdot.cc
+    description: Production
+
+tags:
+  - name: Transcripts
+    description: Look up transcript records
+  - name: Genes
+    description: Look up gene records
+
+paths:
+  /transcript/{transcript_version}:
+    get:
+      tags: [Transcripts]
+      operationId: getTranscript
+      summary: Get a transcript by accession
+      description: |
+        Returns a single transcript record for a **versioned** accession (e.g. `NM_000059.3`).
+
+        For a **versionless** accession (e.g. `NM_000059`) this returns an object containing
+        *every* stored version, keyed by full accession. Choose the lookup form to match the
+        response shape you want.
+      parameters:
+        - name: transcript_version
+          in: path
+          required: true
+          description: Transcript accession, versioned (`NM_000059.3`) or versionless (`NM_000059`).
+          schema:
+            type: string
+          examples:
+            versioned:
+              summary: Versioned - returns a single transcript
+              value: NM_001001890.3
+            versionless:
+              summary: Versionless - returns all versions
+              value: NM_001001890
+      responses:
+        "200":
+          description: |
+            A single transcript (versioned lookup) or a map of accession to transcript
+            (versionless lookup).
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/Transcript"
+                  - $ref: "#/components/schemas/TranscriptMap"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /transcripts:
+    post:
+      tags: [Transcripts]
+      operationId: batchGetTranscripts
+      summary: Batch fetch transcripts
+      description: |
+        Fetch many transcripts in one request. The response is an object keyed by full accession.
+
+        - **Versioned** ids that are missing are present in the response with a value of `null`.
+        - **Versionless** ids are expanded to all of their available versions; an unknown
+          versionless id contributes no keys.
+
+        At most `10000` ids may be requested (after versionless expansion the number of returned
+        transcripts may be larger).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids:
+                  type: array
+                  maxItems: 10000
+                  items:
+                    type: string
+                  description: List of transcript accessions (versioned and/or versionless).
+            example:
+              ids: [NM_001001890.3, NM_001001890, ENST00000344691.8]
+      responses:
+        "200":
+          description: Map of full accession to transcript (or `null` for a missing versioned id).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TranscriptMap"
+        "400":
+          description: |
+            Malformed request - body was not JSON of the form `{"ids": [...]}`, `ids` was not a
+            list of strings, or too many ids were requested.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: 'Expected JSON body of the form {"ids": [...]}'
+
+  /gene/{gene_symbol}:
+    get:
+      tags: [Genes]
+      operationId: getGene
+      summary: Get a gene record by symbol
+      parameters:
+        - name: gene_symbol
+          in: path
+          required: true
+          description: Gene symbol.
+          schema:
+            type: string
+          example: BRCA2
+      responses:
+        "200":
+          description: A gene record.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Gene"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /transcripts/gene/{gene_symbol}:
+    get:
+      tags: [Transcripts]
+      operationId: getTranscriptsForGene
+      summary: List transcripts for a gene
+      parameters:
+        - name: gene_symbol
+          in: path
+          required: true
+          description: Gene symbol.
+          schema:
+            type: string
+          example: BRCA2
+      responses:
+        "200":
+          description: Transcripts associated with the gene.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TranscriptForGeneResults"
+
+  /transcripts/region/{contig}/{aln_method}/{start}/{end}:
+    get:
+      tags: [Transcripts]
+      operationId: getTranscriptsForRegion
+      summary: List transcripts overlapping a genomic region
+      parameters:
+        - name: contig
+          in: path
+          required: true
+          description: Contig / chromosome accession.
+          schema:
+            type: string
+          example: NC_000021.8
+        - name: aln_method
+          in: path
+          required: true
+          description: Alignment method (e.g. `splign` for RefSeq, `genebuild` for Ensembl).
+          schema:
+            type: string
+          example: splign
+        - name: start
+          in: path
+          required: true
+          description: Region start (genomic coordinate).
+          schema:
+            type: integer
+          example: 36160000
+        - name: end
+          in: path
+          required: true
+          description: Region end (genomic coordinate).
+          schema:
+            type: integer
+          example: 36261000
+      responses:
+        "200":
+          description: Transcripts overlapping the region.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TranscriptForRegionResults"
+
+components:
+  responses:
+    NotFound:
+      description: Accession or symbol not found.
+      content:
+        text/plain:
+          schema:
+            type: string
+          example: NM_000059.99 not found
+
+  schemas:
+    Transcript:
+      type: object
+      description: |
+        A transcript record in the [cdot data format](https://github.com/SACGF/cdot/). The full
+        structure is large; key fields are shown below and additional fields may be present.
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+          description: Full transcript accession (with version).
+        gene_name:
+          type: string
+        gene_version:
+          type: string
+        hgnc:
+          type: string
+        biotype:
+          type: array
+          items:
+            type: string
+        protein:
+          type: string
+          description: Associated protein accession, if any.
+        start_codon:
+          type: integer
+        stop_codon:
+          type: integer
+        genome_builds:
+          type: object
+          description: |
+            Per-build alignment data, keyed by build name (`GRCh37`, `GRCh38`, `T2T-CHM13v2.0`).
+            Each entry holds the contig, strand, CDS bounds and exon structure. Each exon is
+            `[genomic_start, genomic_end, exon_number, cds_start, cds_end, gap]`.
+          additionalProperties:
+            type: object
+      example:
+        id: NM_001001890.3
+        gene_name: RUNX1
+        gene_version: "861"
+        hgnc: "10471"
+        biotype: [mRNA]
+        protein: NP_001001890.1
+        start_codon: 1587
+        stop_codon: 2949
+        genome_builds:
+          GRCh38:
+            contig: NC_000021.9
+            strand: "-"
+            cds_start: 34792134
+            cds_end: 34887112
+            exons:
+              - [34787800, 34792610, 5, 2474, 7283, null]
+
+    TranscriptMap:
+      type: object
+      description: |
+        Map of full transcript accession to a transcript record. A value may be `null` when a
+        specifically-requested versioned accession was not found.
+      additionalProperties:
+        oneOf:
+          - $ref: "#/components/schemas/Transcript"
+          - type: "null"
+      example:
+        NM_001001890.3:
+          id: NM_001001890.3
+          gene_name: RUNX1
+        NM_001001890.99: null
+
+    TranscriptForGeneResults:
+      type: object
+      description: |
+        Transcript-to-genome alignment rows for a gene. Note these are UTA-compatible mapping
+        rows, *not* full transcript records - use `/transcript/{accession}` for the full record.
+      properties:
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              tx_ac:
+                type: string
+                description: Transcript accession.
+              alt_ac:
+                type: string
+                description: Aligned contig accession.
+              alt_aln_method:
+                type: string
+                description: Alignment method.
+              hgnc:
+                type: string
+                description: Gene symbol.
+              cds_start_i:
+                type: integer
+                description: CDS start (transcript coordinate).
+              cds_end_i:
+                type: integer
+                description: CDS end (transcript coordinate).
+      example:
+        results:
+          - hgnc: BRCA2
+            cds_start_i: 108
+            cds_end_i: 10365
+            tx_ac: NM_001432077.1
+            alt_ac: NC_000013.10
+            alt_aln_method: splign
+
+    TranscriptForRegionResults:
+      type: object
+      description: |
+        Transcript-to-genome alignment rows overlapping the region. UTA-compatible mapping rows,
+        *not* full transcript records.
+      properties:
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              tx_ac:
+                type: string
+                description: Transcript accession.
+              alt_ac:
+                type: string
+                description: Aligned contig accession.
+              alt_aln_method:
+                type: string
+                description: Alignment method.
+              alt_strand:
+                type: integer
+                description: Strand (1 or -1).
+              start_i:
+                type: integer
+                description: Alignment start (genomic coordinate).
+              end_i:
+                type: integer
+                description: Alignment end (genomic coordinate).
+      example:
+        results:
+          - alt_ac: NC_000021.8
+            alt_aln_method: splign
+            alt_strand: -1
+            start_i: 36228585
+            end_i: 36231875
+            tx_ac: ENST00000467577.1
+
+    Gene:
+      type: object
+      description: A gene record in the cdot data format. Additional fields may be present.
+      additionalProperties: true
+      properties:
+        gene_symbol:
+          type: string
+        map_location:
+          type: string
+        description:
+          type: string
+        hgnc:
+          type: string
+        aliases:
+          type: array
+          items:
+            type: string
+        url:
+          type: string
+      example:
+        gene_symbol: BRCA2
+        map_location: 13q13.1
+        description: BRCA2 DNA repair associated
+        hgnc: "1101"
+        aliases: [FAD, FACD, FAD1, BRCC2, FANCD, FANCD1]
+        url: https://www.ncbi.nlm.nih.gov/gene/675

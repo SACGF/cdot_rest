@@ -2,6 +2,7 @@ import json
 from unittest import mock
 
 import fakeredis
+from django.conf import settings
 from django.core.cache import cache
 from django.test import SimpleTestCase
 from django.urls import reverse
@@ -10,6 +11,43 @@ from django.urls import reverse
 def _make_transcript(accession):
     """ Minimal transcript payload - shape doesn't matter for these tests, identity does """
     return {"id": accession, "gene_name": "BRCA2", "cdot_data_version": "0.2.26"}
+
+
+class ApiDocsTests(SimpleTestCase):
+    """ Docs are flat files served by the web server, but the spec is hand-edited YAML -
+        guard against shipping one that won't parse or has a broken internal reference. """
+
+    STATIC_DIR = settings.BASE_DIR / "cdot_rest" / "static"
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        import yaml
+        cls.spec = yaml.safe_load((cls.STATIC_DIR / "openapi.yaml").read_text())
+
+    def test_is_openapi_3_with_paths(self):
+        self.assertTrue(self.spec["openapi"].startswith("3."))
+        self.assertTrue(self.spec["paths"])
+
+    def test_all_internal_refs_resolve(self):
+        def walk(node):
+            if isinstance(node, dict):
+                for key, value in node.items():
+                    if key == "$ref":
+                        target = self.spec
+                        for part in value.lstrip("#/").split("/"):
+                            self.assertIn(part, target, f"unresolved $ref: {value}")
+                            target = target[part]
+                    else:
+                        walk(value)
+            elif isinstance(node, list):
+                for item in node:
+                    walk(item)
+        walk(self.spec)
+
+    def test_docs_page_references_spec(self):
+        docs = (self.STATIC_DIR / "api-docs.html").read_text()
+        self.assertIn("/static/openapi.yaml", docs)
 
 
 class TranscriptViewTests(SimpleTestCase):
