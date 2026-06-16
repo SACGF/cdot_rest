@@ -4,7 +4,7 @@ info:
   version: "1.0"
   description: |
     REST API for [cdot](https://github.com/SACGF/cdot/) - historical RefSeq and Ensembl
-    transcripts (GRCh37/GRCh38) used to resolve [HGVS](http://varnomen.hgvs.org/).
+    transcripts (GRCh37, GRCh38, T2T-CHM13v2.0) used to resolve [HGVS](http://varnomen.hgvs.org/).
 
     All endpoints are public, read-only, and return JSON. Transcript and gene records follow
     the [cdot data format](https://github.com/SACGF/cdot/).

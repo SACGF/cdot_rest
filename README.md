@@ -2,8 +2,8 @@
 
 REST server for [cdot](https://github.com/SACGF/cdot/).
 
-We host historical versions of RefSeq and Ensembl transcripts (GRCh37/GRCh38) to resolve
-[HGVS](http://varnomen.hgvs.org/).
+We host historical versions of RefSeq and Ensembl transcripts (GRCh37, GRCh38 and T2T-CHM13v2.0)
+to resolve [HGVS](http://varnomen.hgvs.org/).
 
 Public instance: **https://cdotlib.org**
 
@@ -27,8 +27,8 @@ source .venv/bin/activate
 ### Latest (recommended)
 
 Download the latest cdot data [release](https://github.com/SACGF/cdot/releases) (RefSeq and
-Ensembl, GRCh37 + GRCh38) straight from GitHub and load it. The release version is recorded and
-shown on the front page:
+Ensembl, GRCh37 + GRCh38 + T2T-CHM13v2.0) straight from GitHub and load it. The release version is
+recorded and shown on the front page:
 
 ```bash
 python3 manage.py import_transcript_json latest

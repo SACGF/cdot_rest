@@ -24,8 +24,8 @@ def chunks(data, SIZE=10000):
 class Command(BaseCommand):
     ANNOTATION_CONSORTIUMS = ["RefSeq", "Ensembl"]
     VALID_ANNOTATION_CONSORTIUMS = ', '.join(["'%s" % a for a in ANNOTATION_CONSORTIUMS])
-    # Genome builds to pull when running 'latest' (see issue #11). cdot also publishes T2T-CHM13v2.0.
-    LATEST_GENOME_BUILDS = ["GRCh37", "GRCh38"]
+    # Genome builds to pull when running 'latest' (see issues #11, #13).
+    LATEST_GENOME_BUILDS = ["GRCh37", "GRCh38", "T2T-CHM13v2.0"]
 
     def add_arguments(self, parser):
         subparsers = parser.add_subparsers(dest='subcommand')
