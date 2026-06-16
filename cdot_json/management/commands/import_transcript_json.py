@@ -35,11 +35,21 @@ class Command(BaseCommand):
         parser_file.add_argument('--cdot-data-version', required=True, help="Need to specify as using iterator to pull out json")
         parser_file.add_argument('filename', help="cdot json.gz file")
         # No extra params - handles automatically
-        _parser_latest = subparsers.add_parser("latest", help="Automatically retrieve latest from cdot GitHub")
+        parser_latest = subparsers.add_parser("latest", help="Automatically retrieve latest from cdot GitHub")
+
+        # Loading is additive/merge (genome_builds merge, counts accumulate, sets/interval trees union),
+        # so upgrading to a new release on top of an old one leaves stale data behind. --clear wipes the
+        # Redis db first for a clean reload.
+        for subparser in (parser_file, parser_latest):
+            subparser.add_argument('--clear', action='store_true',
+                                   help="Flush all existing data from Redis before loading (clean reload)")
 
 
     def handle(self, *args, **options):
         r = Redis(**settings.REDIS_KWARGS)
+        if options.get("clear"):
+            logging.info("Clearing existing data from Redis (--clear)")
+            r.flushdb()
         subcommand = options["subcommand"]
         if subcommand == "cdot_json":
             annotation_consortium = options["annotation_consortium"]

@@ -54,6 +54,14 @@ The same accession can appear in multiple per-build files (eg a RefSeq transcrip
 GRCh37 and GRCh38 files); the loader merges their `genome_builds` rather than overwriting, so you
 can load builds separately.
 
+Because loading is additive, upgrading to a new release on top of an old one leaves stale data
+behind (accessions dropped in the new release, drifting counts). Pass `--clear` to flush the Redis
+db first for a clean reload — it works with either subcommand and clears before loading anything:
+
+```bash
+python3 manage.py import_transcript_json latest --clear
+```
+
 To copy files onto the server first:
 
 ```bash
