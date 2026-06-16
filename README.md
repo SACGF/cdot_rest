@@ -11,17 +11,6 @@ Public instance: **https://cdotlib.org**
 
 See the [API documentation](https://cdotlib.org/static/api-docs.html) (served from `/static/api-docs.html`).
 
-Endpoints:
-
-| Method | Path | Description |
-| ------ | ---- | ----------- |
-| GET  | `/transcript/<transcript_version>` | A single transcript. A versionless accession (eg `NM_000059`) returns all stored versions. |
-| POST | `/transcripts` | Batch fetch. Body: `{"ids": ["NM_000059.3", "NM_007294", ...]}` |
-| GET  | `/gene/<gene_symbol>` | Gene record |
-| GET  | `/transcripts/gene/<gene_symbol>` | Transcripts for a gene |
-| GET  | `/transcripts/gene/<gene_symbol>/tags/<genome_build>` | Tagged transcripts for a gene (canonical/MANE selection — drives gene-symbol HGVS resolution, [cdot#27](https://github.com/SACGF/cdot/issues/27)) |
-| GET  | `/transcripts/region/<contig>/<aln_method>/<start>/<end>` | Transcripts overlapping a region |
-
 Transcript data is stored in Redis. The front page shows the loaded
 [cdot data release](https://github.com/SACGF/cdot/releases).
 
@@ -32,7 +21,7 @@ Run from the project directory inside the virtual environment:
 ```bash
 sudo su cdot
 cd /opt/cdot_rest
-source venv/cdot/bin/activate
+source .venv/bin/activate
 ```
 
 ### Latest (recommended)
@@ -80,7 +69,10 @@ sudo bash
 apt-get update
 apt-get upgrade -y
 
-apt-get install -y git-core python3-venv redis nginx
+apt-get install -y git-core redis nginx
+
+# uv (https://docs.astral.sh/uv/) - manages the Python virtual environment
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # User and source code
 SYSTEM_CDOT_USER=cdot
@@ -99,11 +91,10 @@ if [ ! -e ${CDOT_REST_INSTALL_DIR}/.git ]; then
 fi
 
 # Python libraries
-python3 -m venv venv/cdot
-source /opt/cdot_rest/venv/cdot/bin/activate
-python3 -m pip install --upgrade pip
-python3 -m pip install gunicorn  # Into the venv so it picks up the libraries
-python3 -m pip install -r requirements.txt
+uv venv .venv
+source /opt/cdot_rest/.venv/bin/activate
+uv pip install gunicorn  # Into the venv so it picks up the libraries
+uv pip install -r requirements.txt
 ```
 
 > **Note:** `requirements.txt` currently pins `cdot` to its git `main` branch — the `latest`
@@ -129,6 +120,6 @@ nginx terminates TLS and proxies to gunicorn — see [`config/nginx.conf`](confi
 ## Development
 
 ```bash
-python3 -m pip install -r requirements-test.txt
+uv pip install -r requirements-test.txt
 python3 manage.py test
 ```
