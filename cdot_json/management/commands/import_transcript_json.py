@@ -68,11 +68,14 @@ class Command(BaseCommand):
             # Loading it all into RAM via json was killed from lack of memory on a 4gig server, so using ijson
 
             transcripts_data = {}
+            versions_by_accession = {}  # versionless accession -> set of full accessions
             # Make this an iterator so that we can pass it and it also does work for us
             def transcripts_iter():
                 for transcript_id, transcript in ijson.kvitems(cdot_json_file, 'transcripts'):
                     transcript["cdot_data_version"] = cdot_data_version
                     transcripts_data[transcript_id] = json.dumps(transcript)
+                    versionless = transcript_id.rsplit(".", 1)[0]
+                    versions_by_accession.setdefault(versionless, set()).add(transcript_id)
                     yield transcript_id, transcript
 
             tx_by_gene, tx_intervals = LocalDataProvider._get_tx_by_gene_and_intervals(transcripts_iter())
@@ -98,6 +101,11 @@ class Command(BaseCommand):
             logging.info("Adding transcripts for gene names")
             for gene_name, transcript_set in tx_by_gene.items():
                 r.sadd(f"transcripts:{gene_name}", *tuple(transcript_set))
+
+            logging.info("Adding versionless accession -> versions index")
+            for versionless, version_set in versions_by_accession.items():
+                r.sadd(f"versions:{versionless}", *tuple(version_set))
+            del versions_by_accession
 
             logging.info("Adding transcript interval trees")
             for contig, iv_tree in tx_intervals.items():
