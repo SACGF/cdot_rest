@@ -22,7 +22,7 @@ SECRET_KEY = get_or_create_django_secret_key(THIS_DIR)
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
-ALLOWED_HOSTS = ["cdot.cc", "129.127.18.77", "localhost"]
+ALLOWED_HOSTS = ["cdotlib.org", "cdot.cc", "129.127.18.77", "localhost"]
 
 
 # Application definition

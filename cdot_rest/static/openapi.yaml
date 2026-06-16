@@ -21,7 +21,7 @@ info:
     url: https://github.com/SACGF/cdot_rest/blob/main/LICENSE
 
 servers:
-  - url: https://cdot.cc
+  - url: https://cdotlib.org
     description: Production
 
 tags:
