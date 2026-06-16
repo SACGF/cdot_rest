@@ -1,3 +1,5 @@
+import gzip
+import io
 import json
 from unittest import mock
 
@@ -93,6 +95,101 @@ class TranscriptViewTests(SimpleTestCase):
     def test_versionless_miss(self):
         response = self.client.get(reverse("transcript", args=["NM_999999"]))
         self.assertEqual(response.status_code, 404)
+
+
+class ImportTranscriptsCommandTests(SimpleTestCase):
+    """ The 'latest' loader pulls per-build files, so the same accession arrives multiple times
+        (once per genome build) - genome_builds must merge, not overwrite (issue #11). """
+
+    @staticmethod
+    def _tx(accession, build):
+        return {
+            "id": accession,
+            "gene_name": "BRCA2",
+            "genome_builds": {build: {"contig": "1", "exons": [[100, 200]]}},
+        }
+
+    @classmethod
+    def _gz(cls, transcripts):
+        payload = {"transcripts": transcripts, "genes": {"BRCA2": {"gene_symbol": "BRCA2"}}}
+        buf = io.BytesIO()
+        with gzip.GzipFile(fileobj=buf, mode="wb") as f:
+            f.write(json.dumps(payload).encode())
+        buf.seek(0)
+        return gzip.GzipFile(fileobj=buf)
+
+    def setUp(self):
+        from cdot_json.management.commands.import_transcript_json import Command
+        self.command = Command()
+        self.redis = fakeredis.FakeStrictRedis()
+
+    def test_genome_builds_merge_across_per_build_files(self):
+        # NM_000059.3 appears in both builds; NM_007294.3 only in GRCh38
+        grch37 = self._gz({"NM_000059.3": self._tx("NM_000059.3", "GRCh37")})
+        grch38 = self._gz({
+            "NM_000059.3": self._tx("NM_000059.3", "GRCh38"),
+            "NM_007294.3": self._tx("NM_007294.3", "GRCh38"),
+        })
+
+        self.command._insert_transcripts(self.redis, "0.2.32", "RefSeq", grch37)
+        self.command._insert_transcripts(self.redis, "0.2.32", "RefSeq", grch38)
+
+        merged = json.loads(self.redis.get("NM_000059.3"))
+        self.assertEqual(set(merged["genome_builds"]), {"GRCh37", "GRCh38"})
+        # Count is unique accessions across builds, not the sum of per-file rows
+        self.assertEqual(int(self.redis.get("refseq_count")), 2)
+
+    def test_reimport_is_idempotent_for_count(self):
+        grch38 = self._gz({"NM_000059.3": self._tx("NM_000059.3", "GRCh38")})
+        self.command._insert_transcripts(self.redis, "0.2.32", "RefSeq", grch38)
+        grch38_again = self._gz({"NM_000059.3": self._tx("NM_000059.3", "GRCh38")})
+        self.command._insert_transcripts(self.redis, "0.2.32", "RefSeq", grch38_again)
+        self.assertEqual(int(self.redis.get("refseq_count")), 1)
+
+    def test_store_release(self):
+        self.command._store_release(self.redis, "0.2.32", {
+            "html_url": "https://github.com/SACGF/cdot/releases/tag/data_v0.2.32"})
+        self.assertEqual(self.redis.get("cdot_data_version").decode(), "0.2.32")
+        self.assertEqual(self.redis.get("cdot_release_url").decode(),
+                         "https://github.com/SACGF/cdot/releases/tag/data_v0.2.32")
+
+    def test_store_release_without_url(self):
+        self.redis.set("cdot_release_url", "stale")
+        self.command._store_release(self.redis, "0.2.32", {})
+        self.assertEqual(self.redis.get("cdot_data_version").decode(), "0.2.32")
+        self.assertIsNone(self.redis.get("cdot_release_url"))
+
+
+class IndexViewTests(SimpleTestCase):
+    def setUp(self):
+        cache.clear()
+        self.redis = fakeredis.FakeStrictRedis()
+        patcher = mock.patch("cdot_rest.views._get_redis", return_value=self.redis)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_release_version_displayed_with_link(self):
+        self.redis.set("cdot_data_version", "0.2.27")
+        self.redis.set("cdot_release_url",
+                       "https://github.com/SACGF/cdot/releases/tag/data_v0.2.27")
+        response = self.client.get(reverse("index"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn("v0.2.27", content)
+        self.assertIn("https://github.com/SACGF/cdot/releases/tag/data_v0.2.27", content)
+
+    def test_release_version_without_url_shown_as_text(self):
+        self.redis.set("cdot_data_version", "0.2.27")
+        response = self.client.get(reverse("index"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn("v0.2.27", content)
+        self.assertNotIn("releases/tag", content)
+
+    def test_no_release_no_version_section(self):
+        response = self.client.get(reverse("index"))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("cdot data release", response.content.decode())
 
 
 class BatchTranscriptsViewTests(SimpleTestCase):

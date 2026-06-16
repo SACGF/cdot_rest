@@ -2,28 +2,83 @@
 #    uv pip compile requirements-test.in -o requirements-test.txt
 asgiref==3.11.1
     # via django
+asttokens==3.0.1
+    # via stack-data
 attrs==26.1.0
-    # via bioutils
+    # via
+    #   bioutils
+    #   hgvs
+biocommons-seqrepo==0.6.11
+    # via hgvs
 bioutils==0.6.1
-    # via cdot
-cdot==0.2.26
+    # via
+    #   biocommons-seqrepo
+    #   cdot
+    #   hgvs
+cdot @ git+https://github.com/SACGF/cdot.git@02063c490d4888a37cc6375a83e8b23cbd11d299
     # via -r requirements.in
 certifi==2026.5.20
     # via requests
 charset-normalizer==3.4.7
     # via requests
+coloredlogs==15.0.1
+    # via biocommons-seqrepo
+configparser==7.2.0
+    # via hgvs
+decorator==5.3.1
+    # via ipython
 django==6.0.6
     # via -r requirements.in
+executing==2.2.1
+    # via stack-data
 fakeredis==2.36.1
     # via -r requirements-test.in
+hgvs==1.5.7
+    # via cdot
+humanfriendly==10.0
+    # via coloredlogs
 idna==3.18
     # via requests
 ijson==3.5.0
     # via -r requirements.in
+importlib-metadata==9.0.0
+    # via yoyo-migrations
+importlib-resources==7.1.0
+    # via hgvs
 intervaltree==3.2.1
     # via cdot
+ipython==8.39.0
+    # via
+    #   biocommons-seqrepo
+    #   hgvs
+jedi==0.20.0
+    # via ipython
 lazy==1.6
     # via cdot
+matplotlib-inline==0.2.2
+    # via ipython
+more-itertools==11.1.0
+    # via cdot
+msgspec==0.21.1
+    # via cdot
+parsley==1.3
+    # via hgvs
+parso==0.8.7
+    # via jedi
+pexpect==4.9.0
+    # via ipython
+prompt-toolkit==3.0.52
+    # via ipython
+psycopg2==2.9.12
+    # via hgvs
+ptyprocess==0.7.0
+    # via pexpect
+pure-eval==0.2.3
+    # via stack-data
+pygments==2.20.0
+    # via ipython
+pysam==0.24.0
+    # via biocommons-seqrepo
 pyyaml==6.0.3
     # via -r requirements-test.in
 redis==8.0.0
@@ -32,6 +87,7 @@ redis==8.0.0
     #   fakeredis
 requests==2.34.2
     # via
+    #   biocommons-seqrepo
     #   bioutils
     #   cdot
 sortedcontainers==2.4.0
@@ -39,6 +95,26 @@ sortedcontainers==2.4.0
     #   fakeredis
     #   intervaltree
 sqlparse==0.5.5
-    # via django
+    # via
+    #   django
+    #   yoyo-migrations
+stack-data==0.6.3
+    # via ipython
+tabulate==0.10.0
+    # via yoyo-migrations
+tqdm==4.68.2
+    # via biocommons-seqrepo
+traitlets==5.15.1
+    # via
+    #   ipython
+    #   matplotlib-inline
+typing-extensions==4.15.0
+    # via biocommons-seqrepo
 urllib3==2.7.0
     # via requests
+wcwidth==0.8.1
+    # via prompt-toolkit
+yoyo-migrations==9.0.0
+    # via biocommons-seqrepo
+zipp==4.1.0
+    # via importlib-metadata

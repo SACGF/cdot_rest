@@ -11,7 +11,7 @@ from redis import Redis
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from itertools import islice
-from cdot.data_release import get_latest_browser_urls, get_latest_data_version_and_release
+from cdot.data_release import get_latest_combo_file_urls, get_latest_data_version_and_release
 from cdot.hgvs.dataproviders import LocalDataProvider
 
 
@@ -24,6 +24,8 @@ def chunks(data, SIZE=10000):
 class Command(BaseCommand):
     ANNOTATION_CONSORTIUMS = ["RefSeq", "Ensembl"]
     VALID_ANNOTATION_CONSORTIUMS = ', '.join(["'%s" % a for a in ANNOTATION_CONSORTIUMS])
+    # Genome builds to pull when running 'latest' (see issue #11). cdot also publishes T2T-CHM13v2.0.
+    LATEST_GENOME_BUILDS = ["GRCh37", "GRCh38"]
 
     def add_arguments(self, parser):
         subparsers = parser.add_subparsers(dest='subcommand')
@@ -48,10 +50,11 @@ class Command(BaseCommand):
             with gzip.open(options["filename"]) as cdot_json_file:
                 self._insert_transcripts(r, cdot_data_version, annotation_consortium, cdot_json_file)
         elif subcommand == "latest":
-            cdot_data_version, _release = get_latest_data_version_and_release()
-            pattern = re.compile(r"cdot-\d+\.\d+\.\d+.all-builds-(ensembl|refseq)-.*.json.gz")
+            cdot_data_version, release = get_latest_data_version_and_release()
+            # eg 'cdot-0.2.32.ensembl.GRCh38.json.gz' -> annotation_consortium='ensembl'
+            pattern = re.compile(r"cdot-\d+\.\d+\.\d+\.(ensembl|refseq)\.(.+)\.json\.gz")
 
-            for browser_url in get_latest_browser_urls():
+            for browser_url in get_latest_combo_file_urls(Command.ANNOTATION_CONSORTIUMS, Command.LATEST_GENOME_BUILDS):
                 filename = browser_url.rsplit("/", maxsplit=1)[-1]
                 if m := pattern.match(filename):
                     annotation_consortium = m.group(1)
@@ -61,6 +64,31 @@ class Command(BaseCommand):
                     fileobj = io.BytesIO(response.content)
                     with gzip.GzipFile(fileobj=fileobj) as cdot_json_file:
                         self._insert_transcripts(r, cdot_data_version, annotation_consortium, cdot_json_file)
+
+            # Record which cdot data release this came from, so we can display it on the front page (issue #11)
+            self._store_release(r, cdot_data_version, release)
+
+    @staticmethod
+    def _store_release(r: Redis, cdot_data_version, release):
+        logging.info("Storing cdot data release %s", cdot_data_version)
+        r.set("cdot_data_version", cdot_data_version)
+        # GitHub release dict - link the front page to the actual release page
+        if release_url := release.get("html_url"):
+            r.set("cdot_release_url", release_url)
+        else:
+            r.delete("cdot_release_url")
+
+    @staticmethod
+    def _merge_genome_builds(existing_json, new_json):
+        """ Combine the genome_builds of a transcript already in Redis with a newly read copy
+            (eg the GRCh37 and GRCh38 records for the same accession), keeping the new copy's
+            other fields. Returns a JSON string ready to store. """
+        existing = json.loads(existing_json)
+        new = json.loads(new_json)
+        genome_builds = existing.get("genome_builds") or {}
+        genome_builds.update(new.get("genome_builds") or {})
+        new["genome_builds"] = genome_builds
+        return json.dumps(new)
 
 
     def _insert_transcripts(self, r: Redis, cdot_data_version, annotation_consortium, cdot_json_file):
@@ -81,12 +109,25 @@ class Command(BaseCommand):
             tx_by_gene, tx_intervals = LocalDataProvider._get_tx_by_gene_and_intervals(transcripts_iter())
 
             logging.info("Inserting into to Redis...")
+            # The same accession can appear in multiple per-build files (eg RefSeq NM_x.y is in both
+            # the GRCh37 and GRCh38 files, each with only its own build) - merge genome_builds rather
+            # than overwrite, so we don't lose alignments. Count only accessions new to Redis.
+            new_accessions = 0
             for td in chunks(transcripts_data):
-                r.mset(td)
+                accessions = list(td)
+                existing = r.mget(accessions)
+                merged = {}
+                for accession, existing_json in zip(accessions, existing):
+                    if existing_json is None:
+                        merged[accession] = td[accession]
+                        new_accessions += 1
+                    else:
+                        merged[accession] = self._merge_genome_builds(existing_json, td[accession])
+                r.mset(merged)
 
-            # Store eg "refseq_count" or "ensembl_count"
+            # Store eg "refseq_count" or "ensembl_count" - accumulate across per-build files
             key = annotation_consortium.lower() + "_count"
-            r.set(key, len(transcripts_data))
+            r.incrby(key, new_accessions)
             del transcripts_data
 
             logging.info("Adding gene data")

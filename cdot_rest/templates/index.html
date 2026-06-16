@@ -19,6 +19,11 @@
                 {% else %}
                 <p class="col-md-8 fs-4">This server has no transcripts (need to run the 'import_transcript_json' command)</p>
                 {% endif %}
+                {% if cdot_data_version %}
+                <p class="col-md-8 text-muted">cdot data release:
+                    {% if cdot_release_url %}<a href="{{ cdot_release_url }}">v{{ cdot_data_version }}</a>{% else %}v{{ cdot_data_version }}{% endif %}
+                </p>
+                {% endif %}
                 <a class="btn btn-primary btn-lg" href="/static/api-docs.html" role="button">API documentation</a>
             </div>
         </div>

@@ -53,6 +53,11 @@ def _get_transcripts(r, accessions):
             for ac, value in zip(accessions, values)}
 
 
+def _decode(value):
+    """ Redis returns bytes; templates want str (None stays None) """
+    return value.decode() if isinstance(value, bytes) else value
+
+
 @cache_page(HOUR_SECONDS)
 def index(request):
     r = _get_redis()
@@ -63,6 +68,8 @@ def index(request):
         "refseq_count": refseq_count,
         "ensembl_count": ensembl_count,
         "total_count": refseq_count + ensembl_count,
+        "cdot_data_version": _decode(r.get("cdot_data_version")),
+        "cdot_release_url": _decode(r.get("cdot_release_url")),
     }
     return render(request, 'index.html', context)
 

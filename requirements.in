@@ -1,4 +1,6 @@
 Django
 redis
 ijson
-cdot
+# Pinned to git main: needs get_latest_browser_urls / get_latest_data_version_and_release,
+# which are not yet in a PyPI release (latest published is 0.2.26). See issue #11.
+cdot @ git+https://github.com/SACGF/cdot.git@main
