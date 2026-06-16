@@ -97,6 +97,56 @@ class TranscriptViewTests(SimpleTestCase):
         self.assertEqual(response.status_code, 404)
 
 
+class TranscriptTagsForGeneViewTests(SimpleTestCase):
+    """ /transcripts/gene/<gene>/tags/<build> exposes get_tx_ac_tags_for_gene over HTTP so a
+        RESTDataProvider can drive gene-symbol HGVS resolution in one round-trip (issue #12). """
+
+    @staticmethod
+    def _tx(accession, build, exons, tag=None):
+        build_data = {"contig": "NC_000013.11", "strand": "+", "exons": exons}
+        if tag is not None:
+            build_data["tag"] = tag
+        return {"id": accession, "gene_name": "BRCA2",
+                "genome_builds": {build: build_data}}
+
+    def setUp(self):
+        cache.clear()
+        self.redis = fakeredis.FakeStrictRedis()
+        patcher = mock.patch("cdot_rest.views._get_redis", return_value=self.redis)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+        # Longer transcript is MANE_Select; shorter has no tags. GRCh38 only.
+        transcripts = {
+            "NM_000059.4": self._tx("NM_000059.4", "GRCh38", [[100, 2100]], "MANE_Select,basic"),
+            "NM_000059.3": self._tx("NM_000059.3", "GRCh38", [[100, 600]]),
+        }
+        for accession, data in transcripts.items():
+            self.redis.set(accession, json.dumps(data))
+            self.redis.sadd("transcripts:BRCA2", accession)
+
+    def _get(self, gene, build):
+        return self.client.get(reverse("transcripts_tags_for_gene", args=[gene, build]))
+
+    def test_returns_tagged_pairs_longest_first(self):
+        response = self._get("BRCA2", "GRCh38")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"results": [
+            ["NM_000059.4", ["MANE_Select", "basic"]],
+            ["NM_000059.3", []],
+        ]})
+
+    def test_unknown_build_returns_empty(self):
+        response = self._get("BRCA2", "GRCh37")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"results": []})
+
+    def test_unknown_gene_returns_empty(self):
+        response = self._get("NOPE", "GRCh38")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"results": []})
+
+
 class ImportTranscriptsCommandTests(SimpleTestCase):
     """ The 'latest' loader pulls per-build files, so the same accession arrives multiple times
         (once per genome build) - genome_builds must merge, not overwrite (issue #11). """

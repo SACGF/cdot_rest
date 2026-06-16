@@ -13,6 +13,8 @@ urlpatterns = [
     path('gene/<gene_symbol>', views.gene, name='gene'),
     path('transcripts/gene/<gene_symbol>', views.transcripts_for_gene,
          name='transcripts_for_gene'),
+    path('transcripts/gene/<gene_symbol>/tags/<genome_build>', views.transcripts_tags_for_gene,
+         name='transcripts_tags_for_gene'),
     path('transcripts/region/<contig>/<aln_method>/<int:start>/<int:end>', views.transcripts_for_region,
          name='transcripts_for_region'),
 ]

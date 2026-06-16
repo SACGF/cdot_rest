@@ -161,6 +161,41 @@ paths:
               schema:
                 $ref: "#/components/schemas/TranscriptForGeneResults"
 
+  /transcripts/gene/{gene_symbol}/tags/{genome_build}:
+    get:
+      tags: [Transcripts]
+      operationId: getTranscriptTagsForGene
+      summary: List tagged transcripts for a gene (for canonical/MANE selection)
+      description: |
+        Returns `[tx_ac, [tags...]]` pairs for every transcript of the gene in the given
+        genome build, sorted longest-first. Tags such as `MANE_Select`, `MANE_Plus_Clinical`,
+        `RefSeq_Select` and `Ensembl_canonical` let a client pick the canonical transcript -
+        this powers gene-symbol HGVS resolution (e.g. `BRCA2:c.36del` -> `NM_000059.4:c.36del`).
+        Ranking is left to the client so callers can override the tag priority.
+      parameters:
+        - name: gene_symbol
+          in: path
+          required: true
+          description: Gene symbol.
+          schema:
+            type: string
+          example: BRCA2
+        - name: genome_build
+          in: path
+          required: true
+          description: Genome build name.
+          schema:
+            type: string
+            enum: [GRCh37, GRCh38, T2T-CHM13v2.0]
+          example: GRCh38
+      responses:
+        "200":
+          description: Tagged transcripts for the gene, longest-first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TranscriptTagsForGeneResults"
+
   /transcripts/region/{contig}/{aln_method}/{start}/{end}:
     get:
       tags: [Transcripts]
@@ -319,6 +354,31 @@ components:
             tx_ac: NM_001432077.1
             alt_ac: NC_000013.10
             alt_aln_method: splign
+
+    TranscriptTagsForGeneResults:
+      type: object
+      description: |
+        Tagged transcripts for a gene in a genome build, sorted longest-first. Each result is a
+        `[tx_ac, [tags...]]` pair; `tags` is empty when the transcript has no tags for that build.
+      properties:
+        results:
+          type: array
+          items:
+            type: array
+            description: "[transcript accession, list of tags]"
+            minItems: 2
+            maxItems: 2
+            prefixItems:
+              - type: string
+                description: Transcript accession.
+              - type: array
+                items:
+                  type: string
+                description: Tags (e.g. MANE_Select, RefSeq_Select, basic).
+      example:
+        results:
+          - [NM_000059.4, [MANE_Select, basic]]
+          - [NM_000059.3, []]
 
     TranscriptForRegionResults:
       type: object

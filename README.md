@@ -19,6 +19,7 @@ Endpoints:
 | POST | `/transcripts` | Batch fetch. Body: `{"ids": ["NM_000059.3", "NM_007294", ...]}` |
 | GET  | `/gene/<gene_symbol>` | Gene record |
 | GET  | `/transcripts/gene/<gene_symbol>` | Transcripts for a gene |
+| GET  | `/transcripts/gene/<gene_symbol>/tags/<genome_build>` | Tagged transcripts for a gene (canonical/MANE selection — drives gene-symbol HGVS resolution, [cdot#27](https://github.com/SACGF/cdot/issues/27)) |
 | GET  | `/transcripts/region/<contig>/<aln_method>/<start>/<end>` | Transcripts overlapping a region |
 
 Transcript data is stored in Redis. The front page shows the loaded

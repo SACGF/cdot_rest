@@ -147,6 +147,19 @@ def transcripts_for_gene(request, gene_symbol):
 
 
 @cache_page(DAY_SECONDS)
+def transcripts_tags_for_gene(request, gene_symbol, genome_build):
+    """ Return [(tx_ac, [tags...]), ...] for a gene in a genome build, longest-first.
+
+        Mirrors LocalDataProvider.get_tx_ac_tags_for_gene so the cdot RESTDataProvider can
+        drive gene-symbol HGVS resolution (canonical/MANE selection) in a single round-trip.
+        Ranking stays client-side, so the raw tags are returned untouched (issue #12, cdot#27).
+    """
+    rdp = RedisDataProvider(_get_redis())
+    data = {"results": rdp.get_tx_ac_tags_for_gene(gene_symbol, genome_build)}
+    return JsonResponse(data)
+
+
+@cache_page(DAY_SECONDS)
 def transcripts_for_region(request, contig, aln_method, start, end):
     rdp = RedisDataProvider(_get_redis())
     data = {"results": rdp.get_tx_for_region(contig, aln_method, start, end)}
