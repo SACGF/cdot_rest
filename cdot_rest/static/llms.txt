@@ -1,0 +1,69 @@
+# cdotlib.org
+
+> Free, public, read-only REST API serving [cdot](https://github.com/SACGF/cdot/) transcript
+> and gene data, so you can resolve [HGVS](http://varnomen.hgvs.org/) variants against
+> historical RefSeq and Ensembl transcripts across genome builds GRCh37, GRCh38 and
+> T2T-CHM13v2.0. All endpoints return JSON. No API key, no auth, no rate limit signup.
+
+Base URL: `https://cdotlib.org`
+
+## Accessions and versions (read this first)
+
+- A transcript **accession** is e.g. `NM_000059.3` (RefSeq) or `ENST00000380152.8` (Ensembl).
+- RefSeq/Ensembl accessions contain no internal `.`, so a `.` marks an explicit **version**.
+- **Versioned** lookup (`NM_000059.3`) returns one transcript record.
+- **Versionless** lookup (`NM_000059`) returns *every stored version*, keyed by full accession.
+- A **gene symbol** is e.g. `BRCA2`.
+- Genome builds are exactly: `GRCh37`, `GRCh38`, `T2T-CHM13v2.0`.
+
+## Endpoints
+
+Get one transcript (versioned) or all versions (versionless):
+```
+curl https://cdotlib.org/transcript/NM_000059.3
+curl https://cdotlib.org/transcript/NM_000059
+```
+
+Batch fetch many transcripts in one POST (cap 10000 ids; versionless ids expand to all versions;
+missing versioned ids come back as `null`):
+```
+curl -X POST https://cdotlib.org/transcripts \
+  -H 'Content-Type: application/json' \
+  -d '{"ids": ["NM_000059.3", "NM_007294", "ENST00000380152.8"]}'
+```
+
+Get a gene record by symbol:
+```
+curl https://cdotlib.org/gene/BRCA2
+```
+
+List all transcripts for a gene:
+```
+curl https://cdotlib.org/transcripts/gene/BRCA2
+```
+
+List a gene's transcripts with their tags (`MANE_Select`, `MANE_Plus_Clinical`, `RefSeq_Select`,
+`Ensembl_canonical`, ...), longest-first, for picking the canonical transcript when resolving a
+gene-symbol HGVS like `BRCA2:c.36del`:
+```
+curl https://cdotlib.org/transcripts/gene/BRCA2/tags/GRCh38
+```
+
+List transcripts overlapping a genomic region (`aln_method` is `splign` for RefSeq,
+`genebuild` for Ensembl):
+```
+curl https://cdotlib.org/transcripts/region/NC_000021.8/splign/36160000/36261000
+```
+
+## To actually resolve HGVS, use the cdot client
+
+This API is the data layer. To convert HGVS to/from genomic coordinates, use the
+[cdot Python library](https://github.com/SACGF/cdot/) with its `RESTDataProvider` pointed at
+`https://cdotlib.org` — it handles transcript selection and the HGVS maths for you.
+
+## Reference
+
+- OpenAPI 3.1 spec (machine-readable): https://cdotlib.org/static/openapi.yaml
+- Human API docs: https://cdotlib.org/static/api-docs.html
+- cdot library: https://github.com/SACGF/cdot/
+- This server's source: https://github.com/SACGF/cdot_rest/

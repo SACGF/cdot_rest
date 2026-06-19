@@ -1,2 +1,3 @@
+# LLMs/agents: see /llms.txt for how to use this API
 User-agent: *
 Disallow: /static/download

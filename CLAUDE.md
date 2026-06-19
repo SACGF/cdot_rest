@@ -69,3 +69,8 @@ CSRF-exempt, capped at `MAX_BATCH_SIZE` ids.
 `cdot_rest/tests.py` holds all tests (SimpleTestCase + fakeredis). The OpenAPI spec
 (`cdot_rest/static/openapi.yaml`) and docs are hand-edited static files; tests guard that the
 spec parses and its internal `$ref`s resolve.
+
+For agent/LLM discovery (issue #15), `cdot_rest/static/llms.txt` is a Markdown crib (with curl
+examples) served at the *root* path `/llms.txt` by nginx (`alias` in `config/nginx.conf`, same
+pattern as `/favicon.ico` and `/robots.txt`) — not a Django view, since it's a flat file and
+that's where agents look. It links to `/static/openapi.yaml` for the machine-readable spec.
