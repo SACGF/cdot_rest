@@ -201,6 +201,76 @@ paths:
               schema:
                 $ref: "#/components/schemas/TranscriptTagsForGeneResults"
 
+  /transcripts/gene/{gene_symbol}/mane/{genome_build}:
+    get:
+      tags: [Transcripts]
+      operationId: getManeTranscriptsForGene
+      summary: Get the MANE transcript(s) for a gene
+      description: |
+        Returns the **MANE** transcript record(s) for a gene in a genome build, keyed by full
+        accession. MANE Select designates one transcript per gene that is identical in RefSeq and
+        Ensembl, so "the MANE transcript" is a matched pair (one `NM_`, one `ENST`). This endpoint
+        does the tag filtering server-side, so you get the answer in one call instead of fetching
+        every tagged transcript via `/transcripts/gene/{gene_symbol}/tags/{genome_build}` and
+        picking yourself.
+
+        - With `annotation_consortium=RefSeq` (or `Ensembl`) you get that consortium's single
+          MANE Select accession.
+        - Omitting `annotation_consortium` returns **both** halves of the matched pair.
+        - `plus_clinical=true` additionally returns MANE Plus Clinical transcripts (a gene may
+          have several); by default only MANE Select is returned.
+
+        Tag spelling differs across consortia (RefSeq `MANE Select`, Ensembl `MANE_Select`); the
+        server normalises this when matching. An unknown gene/build, or a gene with no MANE
+        transcript, returns an empty object `{}`.
+      parameters:
+        - name: gene_symbol
+          in: path
+          required: true
+          description: Gene symbol.
+          schema:
+            type: string
+          example: BRCA2
+        - name: genome_build
+          in: path
+          required: true
+          description: Genome build name.
+          schema:
+            type: string
+            enum: [GRCh37, GRCh38, T2T-CHM13v2.0]
+          example: GRCh38
+        - name: annotation_consortium
+          in: query
+          required: false
+          description: Restrict to one consortium's accession. Omit to return the matched pair.
+          schema:
+            type: string
+            enum: [RefSeq, Ensembl]
+          example: RefSeq
+        - name: plus_clinical
+          in: query
+          required: false
+          description: Also include MANE Plus Clinical transcripts (default false).
+          schema:
+            type: boolean
+          example: false
+      responses:
+        "200":
+          description: |
+            Map of full accession to transcript for the gene's MANE transcript(s). Empty when the
+            gene/build is unknown or the gene has no MANE transcript.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TranscriptMap"
+        "400":
+          description: '`annotation_consortium` was not `RefSeq` or `Ensembl`.'
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: annotation_consortium must be "RefSeq" or "Ensembl"
+
   /transcripts/region/{contig}/{aln_method}/{start}/{end}:
     get:
       tags: [Transcripts]

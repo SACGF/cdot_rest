@@ -147,6 +147,94 @@ class TranscriptTagsForGeneViewTests(SimpleTestCase):
         self.assertEqual(response.json(), {"results": []})
 
 
+class ManeTranscriptsForGeneViewTests(SimpleTestCase):
+    """ /transcripts/gene/<gene>/mane/<build> filters to MANE transcripts server-side and returns
+        their full records keyed by accession, so a client gets the answer in one call (issue #14).
+
+        MANE Select is a matched RefSeq+Ensembl pair; tag spelling differs by consortium
+        (RefSeq 'MANE Select' vs Ensembl 'MANE_Select'), which the view normalizes. """
+
+    @staticmethod
+    def _tx(accession, build, exons, tag=None):
+        build_data = {"contig": "NC_000013.11", "strand": "+", "exons": exons}
+        if tag is not None:
+            build_data["tag"] = tag
+        return {"id": accession, "gene_name": "BRCA2",
+                "genome_builds": {build: build_data}}
+
+    def setUp(self):
+        cache.clear()
+        self.redis = fakeredis.FakeStrictRedis()
+        patcher = mock.patch("cdot_rest.views._get_redis", return_value=self.redis)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+        # MANE Select is the matched pair NM_000059.4 (space spelling) + ENST...8 (underscore).
+        # NM_058195.4 is MANE Plus Clinical (RefSeq). NM_000059.3 has only RefSeq Select - not MANE.
+        self.transcripts = {
+            "NM_000059.4": self._tx("NM_000059.4", "GRCh38", [[100, 2100]], "MANE Select"),
+            "ENST00000380152.8": self._tx("ENST00000380152.8", "GRCh38", [[100, 2100]],
+                                          "MANE_Select,Ensembl_canonical"),
+            "NM_058195.4": self._tx("NM_058195.4", "GRCh38", [[100, 900]], "MANE Plus Clinical"),
+            "NM_000059.3": self._tx("NM_000059.3", "GRCh38", [[100, 600]], "RefSeq Select"),
+        }
+        for accession, data in self.transcripts.items():
+            self.redis.set(accession, json.dumps(data))
+            self.redis.sadd("transcripts:BRCA2", accession)
+
+    def _get(self, gene, build, **params):
+        url = reverse("mane_transcripts_for_gene", args=[gene, build])
+        return self.client.get(url, params)
+
+    def test_no_consortium_returns_both_mane_select(self):
+        response = self._get("BRCA2", "GRCh38")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {
+            "NM_000059.4": self.transcripts["NM_000059.4"],
+            "ENST00000380152.8": self.transcripts["ENST00000380152.8"],
+        })
+
+    def test_refseq_consortium_returns_one(self):
+        response = self._get("BRCA2", "GRCh38", annotation_consortium="RefSeq")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(),
+                         {"NM_000059.4": self.transcripts["NM_000059.4"]})
+
+    def test_ensembl_consortium_returns_one(self):
+        response = self._get("BRCA2", "GRCh38", annotation_consortium="ensembl")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(),
+                         {"ENST00000380152.8": self.transcripts["ENST00000380152.8"]})
+
+    def test_plus_clinical_excluded_by_default(self):
+        response = self._get("BRCA2", "GRCh38", annotation_consortium="RefSeq")
+        self.assertNotIn("NM_058195.4", response.json())
+
+    def test_plus_clinical_included_when_requested(self):
+        response = self._get("BRCA2", "GRCh38", annotation_consortium="RefSeq",
+                             plus_clinical="true")
+        self.assertEqual(set(response.json()), {"NM_000059.4", "NM_058195.4"})
+
+    def test_refseq_select_is_not_mane(self):
+        # NM_000059.3 carries only 'RefSeq Select' - must not be returned by the MANE endpoint
+        response = self._get("BRCA2", "GRCh38")
+        self.assertNotIn("NM_000059.3", response.json())
+
+    def test_unknown_gene_returns_empty(self):
+        response = self._get("NOPE", "GRCh38")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {})
+
+    def test_unknown_build_returns_empty(self):
+        response = self._get("BRCA2", "GRCh37")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {})
+
+    def test_bad_consortium_is_400(self):
+        response = self._get("BRCA2", "GRCh38", annotation_consortium="banana")
+        self.assertEqual(response.status_code, 400)
+
+
 class ImportTranscriptsCommandTests(SimpleTestCase):
     """ The 'latest' loader pulls per-build files, so the same accession arrives multiple times
         (once per genome build) - genome_builds must merge, not overwrite (issue #11). """

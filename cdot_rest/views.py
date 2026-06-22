@@ -58,6 +58,23 @@ def _decode(value):
     return value.decode() if isinstance(value, bytes) else value
 
 
+def _normalize_tag(tag):
+    """ Tags are verbatim from source, so the same concept is spelled differently across
+        consortia: RefSeq 'MANE Select' vs Ensembl 'MANE_Select'. Fold to a common form
+        (lowercase, spaces->underscores) so both match (cdot SACGF/cdot#116). """
+    return tag.strip().lower().replace(" ", "_")
+
+
+# MANE tag (normalized) -> whether it's a "plus clinical" tag (excluded unless asked for)
+MANE_SELECT = "mane_select"
+MANE_PLUS_CLINICAL = "mane_plus_clinical"
+
+
+def _annotation_consortium(accession):
+    """ Infer the consortium from the accession prefix (Ensembl transcripts are ENST...) """
+    return "Ensembl" if accession.startswith("ENST") else "RefSeq"
+
+
 @cache_page(HOUR_SECONDS)
 def index(request):
     r = _get_redis()
@@ -157,6 +174,52 @@ def transcripts_tags_for_gene(request, gene_symbol, genome_build):
     rdp = RedisDataProvider(_get_redis())
     data = {"results": rdp.get_tx_ac_tags_for_gene(gene_symbol, genome_build)}
     return JsonResponse(data)
+
+
+@cache_page(DAY_SECONDS)
+def mane_transcripts_for_gene(request, gene_symbol, genome_build):
+    """ Return the MANE transcript(s) for a gene in a genome build, keyed by full accession.
+
+        MANE Select designates one transcript per gene that is identical in RefSeq and Ensembl,
+        so "the MANE transcript" is really a matched pair (one NM_, one ENST). This endpoint
+        does the tag filtering server-side so a client gets the answer in one call (issue #14)
+        instead of fetching every tagged transcript and picking (the /tags/ endpoint).
+
+        Query params:
+          annotation_consortium=RefSeq|Ensembl  - restrict to one consortium's accession.
+                                                   Omitted -> return both (the matched pair).
+          plus_clinical=true                     - also include MANE Plus Clinical transcripts
+                                                   (a gene may have several); default is
+                                                   MANE Select only.
+
+        Tag spelling differs by consortium (RefSeq 'MANE Select' vs Ensembl 'MANE_Select'), so
+        matching is done on a normalized form. Unknown gene/build or no MANE transcript -> {}.
+    """
+    consortium = request.GET.get("annotation_consortium")
+    if consortium is not None:
+        consortium = consortium.strip().lower()
+        if consortium not in ("refseq", "ensembl"):
+            return HttpResponseBadRequest(
+                'annotation_consortium must be "RefSeq" or "Ensembl"')
+
+    include_plus_clinical = request.GET.get("plus_clinical", "").strip().lower() in (
+        "1", "true", "yes")
+
+    wanted_tags = {MANE_SELECT}
+    if include_plus_clinical:
+        wanted_tags.add(MANE_PLUS_CLINICAL)
+
+    r = _get_redis()
+    rdp = RedisDataProvider(r)
+    accessions = []
+    for tx_ac, tags in rdp.get_tx_ac_tags_for_gene(gene_symbol, genome_build):
+        if not wanted_tags.intersection(_normalize_tag(t) for t in tags):
+            continue
+        if consortium and _annotation_consortium(tx_ac).lower() != consortium:
+            continue
+        accessions.append(tx_ac)
+
+    return JsonResponse(_get_transcripts(r, accessions))
 
 
 @cache_page(DAY_SECONDS)

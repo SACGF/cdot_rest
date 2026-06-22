@@ -53,6 +53,15 @@ be spelled differently across consortia: RefSeq emits MANE tags with spaces (`MA
 `MANE Plus Clinical`) while Ensembl uses underscores (`MANE_Select`, `MANE_Plus_Clinical`).
 Normalise spaces to underscores before matching tags across consortia (see cdot SACGF/cdot#116).
 
+Get the MANE transcript for a gene directly (the server does the tag filtering for you). MANE
+Select is a matched RefSeq+Ensembl pair, so this returns both halves keyed by accession; pass
+`annotation_consortium` to get just one. Add `plus_clinical=true` to also include MANE Plus
+Clinical. Returns `{}` if the gene has no MANE transcript:
+```
+curl https://cdotlib.org/transcripts/gene/BRCA2/mane/GRCh38
+curl 'https://cdotlib.org/transcripts/gene/BRCA2/mane/GRCh38?annotation_consortium=RefSeq'
+```
+
 List transcripts overlapping a genomic region (`aln_method` is `splign` for RefSeq,
 `genebuild` for Ensembl):
 ```
