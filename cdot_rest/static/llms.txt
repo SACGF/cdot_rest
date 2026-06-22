@@ -48,6 +48,10 @@ gene-symbol HGVS like `BRCA2:c.36del`:
 ```
 curl https://cdotlib.org/transcripts/gene/BRCA2/tags/GRCh38
 ```
+Tags are returned **verbatim from the source RefSeq/Ensembl annotation**, so the same concept can
+be spelled differently across consortia: RefSeq emits MANE tags with spaces (`MANE Select`,
+`MANE Plus Clinical`) while Ensembl uses underscores (`MANE_Select`, `MANE_Plus_Clinical`).
+Normalise spaces to underscores before matching tags across consortia (see cdot SACGF/cdot#116).
 
 List transcripts overlapping a genomic region (`aln_method` is `splign` for RefSeq,
 `genebuild` for Ensembl):

@@ -172,6 +172,11 @@ paths:
         `RefSeq_Select` and `Ensembl_canonical` let a client pick the canonical transcript -
         this powers gene-symbol HGVS resolution (e.g. `BRCA2:c.36del` -> `NM_000059.4:c.36del`).
         Ranking is left to the client so callers can override the tag priority.
+
+        Tags are returned verbatim from the source annotation, so the same concept can be spelled
+        differently across consortia: RefSeq emits MANE tags with spaces (`MANE Select`,
+        `MANE Plus Clinical`) while Ensembl uses underscores (`MANE_Select`, `MANE_Plus_Clinical`).
+        Normalise spaces to underscores before matching tags across consortia (cdot SACGF/cdot#116).
       parameters:
         - name: gene_symbol
           in: path
@@ -374,10 +379,16 @@ components:
               - type: array
                 items:
                   type: string
-                description: Tags (e.g. MANE_Select, RefSeq_Select, basic).
+                description: >-
+                  Tags, verbatim from the source annotation. The same concept may be spelled
+                  differently across consortia - RefSeq uses spaces (e.g. `MANE Select`,
+                  `RefSeq Select`) while Ensembl uses underscores (e.g. `MANE_Select`,
+                  `Ensembl_canonical`); normalise spaces to underscores before cross-consortium
+                  matching (cdot SACGF/cdot#116).
       example:
         results:
-          - [NM_000059.4, [MANE_Select, basic]]
+          - [NM_000059.4, ["MANE Select", "RefSeq Select"]]
+          - [ENST00000380152.8, [MANE_Select, basic]]
           - [NM_000059.3, []]
 
     TranscriptForRegionResults:
