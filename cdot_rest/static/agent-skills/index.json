@@ -1,0 +1,12 @@
+{
+  "$schema": "https://schemas.agentskills.io/discovery/0.2.0/schema.json",
+  "skills": [
+    {
+      "name": "cdotlib-api",
+      "type": "skill-md",
+      "description": "Resolve HGVS variants and look up RefSeq/Ensembl transcript and gene data via the free cdotlib.org REST API - transcript coordinates, MANE/canonical selection, gene-to-transcript mapping, region queries and historical versions across GRCh37, GRCh38 and T2T-CHM13v2.0.",
+      "url": "/.well-known/agent-skills/cdotlib-api/SKILL.md",
+      "digest": "sha256:fd8f9e3e1b5ef449022600771cf35124c1b38759461a4321495526c3b58f26f7"
+    }
+  ]
+}

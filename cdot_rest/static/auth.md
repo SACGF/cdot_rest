@@ -1,7 +1,10 @@
-# Authentication
+# auth.md
 
-**None.** cdotlib.org is a free, public, read-only REST API. There is no
-authentication, no API key, no OAuth, and no signup. Just make the request:
+**No authentication.** cdotlib.org is a free, public, read-only REST API. Any
+client — AI agents, scripts, or humans — may call every endpoint anonymously.
+There is no API key, no OAuth, no registration, and no rate-limit signup.
+
+Access method: send the request, get JSON back.
 
 ```
 curl https://cdotlib.org/transcript/NM_000059.3
