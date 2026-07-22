@@ -1,0 +1,26 @@
+{
+  "linkset": [
+    {
+      "anchor": "https://cdotlib.org/",
+      "service-desc": [
+        {
+          "href": "https://cdotlib.org/static/openapi.yaml",
+          "type": "application/yaml",
+          "title": "cdot REST API - OpenAPI 3.1 specification"
+        }
+      ],
+      "service-doc": [
+        {
+          "href": "https://cdotlib.org/static/api-docs.html",
+          "type": "text/html",
+          "title": "cdot REST API - human documentation (Swagger UI)"
+        },
+        {
+          "href": "https://cdotlib.org/llms.txt",
+          "type": "text/markdown",
+          "title": "cdot REST API - agent/LLM usage guide"
+        }
+      ]
+    }
+  ]
+}

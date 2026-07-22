@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Static sitemap - cdotlib.org is a small read-only API with a handful of
+     human-facing HTML pages; the JSON endpoints are described in openapi.yaml,
+     not listed here. Served at the root path /sitemap.xml by nginx. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://cdotlib.org/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://cdotlib.org/static/api-docs.html</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+</urlset>

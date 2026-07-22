@@ -1,3 +1,10 @@
 # LLMs/agents: see /llms.txt for how to use this API
 User-agent: *
+# Content Signals (https://contentsignals.org/). Signals are group-wide, not
+# per-path: the crawlable pages here are human-written docs, so training on them
+# is fine. The bulk transcript/gene corpus lives under /download/ and is
+# Disallowed entirely, keeping it out of both crawling and training.
+Content-Signal: search=yes, ai-input=yes, ai-train=yes
 Disallow: /download/
+
+Sitemap: https://cdotlib.org/sitemap.xml
