@@ -147,6 +147,27 @@ systemctl start gunicorn
 
 nginx terminates TLS and proxies to gunicorn — see [`config/nginx.conf`](config/nginx.conf).
 
+Also install the [automatic updates](#automatic-updates) timer.
+
+## Updating a deployed server
+
+```bash
+sudo su cdot
+cd /opt/cdot_rest
+source .venv/bin/activate
+git pull
+uv pip install -r requirements.txt
+# nginx serves static files (and llms.txt, robots.txt etc) from cdot_rest/sitestatic
+python3 manage.py collectstatic --noinput
+exit
+
+# As root
+systemctl reload gunicorn
+```
+
+If `config/` has changed, copy the changed files into place (`/lib/systemd/system` for the systemd
+units, then `systemctl daemon-reload`; nginx config then `nginx -t && systemctl reload nginx`).
+
 ## Development
 
 ```bash
