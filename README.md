@@ -78,9 +78,12 @@ cp config/cdot-update.service config/cdot-update.timer /lib/systemd/system
 systemctl daemon-reload
 systemctl enable --now cdot-update.timer
 
-systemctl start cdot-update       # run a check now
-journalctl -u cdot-update         # logs
+systemctl start --no-block cdot-update   # run a check now, in the background (a load takes ~20 mins)
+journalctl -u cdot-update -f             # follow the logs - Ctrl-C to stop watching, the job carries on
+systemctl status cdot-update             # "inactive (dead)" + status=0/SUCCESS when finished
 ```
+
+Without `--no-block`, `systemctl start` waits until the load has finished.
 
 The job fails (shows in `systemctl --failed`) if a newer data release needs a newer cdot client
 (a data schema change). Upgrade cdot on the server to pick it up.
