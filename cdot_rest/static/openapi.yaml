@@ -57,6 +57,8 @@ paths:
               summary: Versionless - returns all versions
               value: NM_001001890
       responses:
+        "503":
+          $ref: "#/components/responses/DataLoading"
         "200":
           description: |
             A single transcript (versioned lookup) or a map of accession to transcript
@@ -101,6 +103,8 @@ paths:
             example:
               ids: [NM_001001890.3, NM_001001890, ENST00000344691.8]
       responses:
+        "503":
+          $ref: "#/components/responses/DataLoading"
         "200":
           description: Map of full accession to transcript (or `null` for a missing versioned id).
           content:
@@ -131,6 +135,8 @@ paths:
             type: string
           example: BRCA2
       responses:
+        "503":
+          $ref: "#/components/responses/DataLoading"
         "200":
           description: A gene record.
           content:
@@ -154,6 +160,8 @@ paths:
             type: string
           example: BRCA2
       responses:
+        "503":
+          $ref: "#/components/responses/DataLoading"
         "200":
           description: Transcripts associated with the gene.
           content:
@@ -194,6 +202,8 @@ paths:
             enum: [GRCh37, GRCh38, T2T-CHM13v2.0]
           example: GRCh38
       responses:
+        "503":
+          $ref: "#/components/responses/DataLoading"
         "200":
           description: Tagged transcripts for the gene, longest-first.
           content:
@@ -255,6 +265,8 @@ paths:
             type: boolean
           example: false
       responses:
+        "503":
+          $ref: "#/components/responses/DataLoading"
         "200":
           description: |
             Map of full accession to transcript for the gene's MANE transcript(s). Empty when the
@@ -306,6 +318,8 @@ paths:
             type: integer
           example: 36261000
       responses:
+        "503":
+          $ref: "#/components/responses/DataLoading"
         "200":
           description: Transcripts overlapping the region.
           content:
@@ -322,6 +336,19 @@ components:
           schema:
             type: string
           example: NM_000059.99 not found
+    DataLoading:
+      description: |
+        A new cdot data release is being loaded (this happens every few months and takes around
+        20 minutes). Retry after the `Retry-After` header (seconds).
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+      content:
+        text/plain:
+          schema:
+            type: string
+          example: cdot data is loading, retry later
 
   schemas:
     Transcript:

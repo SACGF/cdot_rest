@@ -1,0 +1,15 @@
+[Unit]
+Description=Load the latest cdot data release into Redis, if newer than what is loaded
+After=network-online.target redis-server.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=cdot
+WorkingDirectory=/opt/cdot_rest
+PrivateTmp=true
+# Flushes and reloads in place (~20 mins downtime). With RAM for two copies of the data, use --staging-db=1
+# instead of --clear to load into a spare db and swap it live with no downtime.
+ExecStart=/opt/cdot_rest/.venv/bin/python3 manage.py import_transcript_json latest --if-newer --clear
+# gunicorn workers each cache responses in memory (cache_page) - restart them so they don't serve pre-update data
+ExecStartPost=+/bin/systemctl reload gunicorn

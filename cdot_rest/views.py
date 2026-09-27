@@ -1,4 +1,5 @@
 import json
+from functools import wraps
 
 import redis
 from django.conf import settings
@@ -21,6 +22,20 @@ MAX_BATCH_SIZE = 10000
 
 def _get_redis():
     return redis.Redis(**settings.REDIS_KWARGS)
+
+
+def require_data_loaded(view_func):
+    """ cdot_data_version is stored last when loading a release (and removed by --clear), so if it's
+        missing the data is loading or a load failed. Return 503 rather than 404s that clients would
+        take as "transcript doesn't exist". Goes outside @cache_page so the 503 is never cached. """
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if not _get_redis().exists("cdot_data_version"):
+            response = HttpResponse("cdot data is loading, retry later", status=503, content_type="text/plain")
+            response["Retry-After"] = str(30 * MINUTE_SECONDS)
+            return response
+        return view_func(request, *args, **kwargs)
+    return wrapper
 
 
 def _is_versionless(accession):
@@ -91,6 +106,7 @@ def index(request):
     return render(request, 'index.html', context)
 
 
+@require_data_loaded
 @cache_page(DAY_SECONDS)
 def gene(request, gene_symbol):
     r = _get_redis()
@@ -101,6 +117,7 @@ def gene(request, gene_symbol):
     return HttpResponse(data, content_type='application/json')
 
 
+@require_data_loaded
 @cache_page(DAY_SECONDS)
 def transcript(request, transcript_version):
     r = _get_redis()
@@ -121,6 +138,7 @@ def transcript(request, transcript_version):
 
 @csrf_exempt
 @require_POST
+@require_data_loaded
 def transcripts(request):
     """ Batch fetch transcripts.
 
@@ -156,6 +174,7 @@ def transcripts(request):
     return JsonResponse(_get_transcripts(r, accessions))
 
 
+@require_data_loaded
 @cache_page(DAY_SECONDS)
 def transcripts_for_gene(request, gene_symbol):
     rdp = RedisDataProvider(_get_redis())
@@ -163,6 +182,7 @@ def transcripts_for_gene(request, gene_symbol):
     return JsonResponse(data)
 
 
+@require_data_loaded
 @cache_page(DAY_SECONDS)
 def transcripts_tags_for_gene(request, gene_symbol, genome_build):
     """ Return [(tx_ac, [tags...]), ...] for a gene in a genome build, longest-first.
@@ -176,6 +196,7 @@ def transcripts_tags_for_gene(request, gene_symbol, genome_build):
     return JsonResponse(data)
 
 
+@require_data_loaded
 @cache_page(DAY_SECONDS)
 def mane_transcripts_for_gene(request, gene_symbol, genome_build):
     """ Return the MANE transcript(s) for a gene in a genome build, keyed by full accession.
@@ -222,6 +243,7 @@ def mane_transcripts_for_gene(request, gene_symbol, genome_build):
     return JsonResponse(_get_transcripts(r, accessions))
 
 
+@require_data_loaded
 @cache_page(DAY_SECONDS)
 def transcripts_for_region(request, contig, aln_method, start, end):
     rdp = RedisDataProvider(_get_redis())

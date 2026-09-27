@@ -56,6 +56,7 @@ class TranscriptViewTests(SimpleTestCase):
     def setUp(self):
         cache.clear()
         self.redis = fakeredis.FakeStrictRedis()
+        self.redis.set("cdot_data_version", "0.2.26")
         patcher = mock.patch("cdot_rest.views._get_redis", return_value=self.redis)
         patcher.start()
         self.addCleanup(patcher.stop)
@@ -96,6 +97,18 @@ class TranscriptViewTests(SimpleTestCase):
         response = self.client.get(reverse("transcript", args=["NM_999999"]))
         self.assertEqual(response.status_code, 404)
 
+    # --- data release loading (no cdot_data_version) ---
+
+    def test_loading_is_503_not_cached(self):
+        self.redis.delete("cdot_data_version")
+        response = self.client.get(reverse("transcript", args=["NM_000059.3"]))
+        self.assertEqual(response.status_code, 503)
+        self.assertIn("Retry-After", response)
+
+        self.redis.set("cdot_data_version", "0.2.27")
+        response = self.client.get(reverse("transcript", args=["NM_000059.3"]))
+        self.assertEqual(response.status_code, 200)
+
 
 class TranscriptTagsForGeneViewTests(SimpleTestCase):
     """ /transcripts/gene/<gene>/tags/<build> exposes get_tx_ac_tags_for_gene over HTTP so a
@@ -112,6 +125,7 @@ class TranscriptTagsForGeneViewTests(SimpleTestCase):
     def setUp(self):
         cache.clear()
         self.redis = fakeredis.FakeStrictRedis()
+        self.redis.set("cdot_data_version", "0.2.26")
         patcher = mock.patch("cdot_rest.views._get_redis", return_value=self.redis)
         patcher.start()
         self.addCleanup(patcher.stop)
@@ -165,6 +179,7 @@ class ManeTranscriptsForGeneViewTests(SimpleTestCase):
     def setUp(self):
         cache.clear()
         self.redis = fakeredis.FakeStrictRedis()
+        self.redis.set("cdot_data_version", "0.2.26")
         patcher = mock.patch("cdot_rest.views._get_redis", return_value=self.redis)
         patcher.start()
         self.addCleanup(patcher.stop)
@@ -298,6 +313,81 @@ class ImportTranscriptsCommandTests(SimpleTestCase):
         self.assertIsNone(self.redis.get("cdot_release_url"))
 
 
+
+class ScheduledUpdateTests(SimpleTestCase):
+    """ 'latest --if-newer --staging-db' is run on a timer: skip if already loaded, otherwise load
+        into a spare db and swap it live, never leaving the site empty or half-loaded. """
+    MODULE = "cdot_json.management.commands.import_transcript_json"
+
+    def setUp(self):
+        self.server = fakeredis.FakeServer()
+        self.live = fakeredis.FakeStrictRedis(server=self.server, db=0)
+        self.staging = fakeredis.FakeStrictRedis(server=self.server, db=1)
+        self.live.set("cdot_data_version", "0.2.34")
+        self.live.set("NM_000059.3", "old")
+        self.live.set("refseq_count", 100)
+        self.live.set("ensembl_count", 100)
+
+    def _redis(self, **kwargs):
+        return fakeredis.FakeStrictRedis(server=self.server, db=kwargs.get("db", 0))
+
+    def _call(self, latest_version, load=None, releases=()):
+        """ Run 'latest --if-newer --staging-db=1', with 'load' standing in for the download/insert """
+        from django.core.management import call_command
+        releases_response = mock.Mock(**{"json.return_value": list(releases)})
+        with mock.patch(f"{self.MODULE}.Redis", side_effect=self._redis), \
+                mock.patch(f"{self.MODULE}.get_latest_data_version_and_release",
+                           return_value=(latest_version, {"html_url": "url"})), \
+                mock.patch(f"{self.MODULE}.requests.get", return_value=releases_response), \
+                mock.patch(f"{self.MODULE}.Command._load", side_effect=load) as mock_load:
+            call_command("import_transcript_json", "latest", "--if-newer", "--staging-db=1")
+        return mock_load
+
+    def test_already_loaded_does_nothing(self):
+        mock_load = self._call("0.2.34")
+        mock_load.assert_not_called()
+        self.assertEqual(self.live.get("NM_000059.3"), b"old")
+
+    def test_new_release_swapped_in(self):
+        def load(r, *args):
+            self.assertEqual(self.live.get("NM_000059.3"), b"old")  # Live untouched while loading
+            r.mset({"NM_000059.4": "new", "refseq_count": 101, "ensembl_count": 100,
+                    "cdot_data_version": "0.2.35"})
+
+        self._call("0.2.35", load=load)
+        self.assertEqual(self.live.get("cdot_data_version"), b"0.2.35")
+        self.assertEqual(self.live.get("NM_000059.4"), b"new")
+        self.assertIsNone(self.live.get("NM_000059.3"))  # Clean reload - stale accession gone
+        self.assertEqual(self.staging.dbsize(), 0)  # Old copy freed
+
+    def test_short_load_not_swapped_in(self):
+        from django.core.management import CommandError
+
+        def load(r, *args):
+            r.mset({"refseq_count": 10, "ensembl_count": 100, "cdot_data_version": "0.2.35"})
+
+        with self.assertRaises(CommandError):
+            self._call("0.2.35", load=load)
+        self.assertEqual(self.live.get("cdot_data_version"), b"0.2.34")
+        self.assertEqual(self.staging.dbsize(), 0)
+
+    def test_failed_load_leaves_live_alone(self):
+        def load(r, *args):
+            r.set("partial", 1)
+            raise IOError("download failed")
+
+        with self.assertRaises(IOError):
+            self._call("0.2.35", load=load)
+        self.assertEqual(self.live.get("NM_000059.3"), b"old")
+        self.assertEqual(self.staging.dbsize(), 0)
+
+    def test_incompatible_newer_schema_fails(self):
+        from django.core.management import CommandError
+        releases = [{"tag_name": "data_v0.3.0"}, {"tag_name": "v0.2.31"}, {"tag_name": "data_v0.2.34"}]
+        with self.assertRaisesRegex(CommandError, "0.3.0"):
+            self._call("0.2.34", releases=releases)
+
+
 class IndexViewTests(SimpleTestCase):
     def setUp(self):
         cache.clear()
@@ -334,6 +424,7 @@ class BatchTranscriptsViewTests(SimpleTestCase):
     def setUp(self):
         cache.clear()
         self.redis = fakeredis.FakeStrictRedis()
+        self.redis.set("cdot_data_version", "0.2.26")
         patcher = mock.patch("cdot_rest.views._get_redis", return_value=self.redis)
         patcher.start()
         self.addCleanup(patcher.stop)
@@ -352,6 +443,11 @@ class BatchTranscriptsViewTests(SimpleTestCase):
     def _post(self, body):
         return self.client.post(reverse("transcripts"), data=json.dumps(body),
                                 content_type="application/json")
+
+    def test_loading_is_503(self):
+        self.redis.delete("cdot_data_version")
+        response = self._post({"ids": ["NM_000059.2"]})
+        self.assertEqual(response.status_code, 503)
 
     def test_versioned_ids(self):
         response = self._post({"ids": ["NM_000059.2", "NM_007294.3"]})

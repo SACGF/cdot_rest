@@ -62,6 +62,29 @@ db first for a clean reload — it works with either subcommand and clears befor
 python3 manage.py import_transcript_json latest --clear
 ```
 
+### Automatic updates
+
+A systemd timer checks GitHub daily and loads a new data release when one is published. It flushes
+Redis and reloads, so the site is down for the load (~20 mins). The release version is stored last, so if
+a load fails the next run retries it.
+
+With RAM for two full copies of the data (8GB), change `--clear` to `--staging-db=1` in
+`cdot-update.service` to avoid the downtime: it loads into a spare Redis db and swaps it live with
+`SWAPDB` once complete, and a failed or short load never replaces the live data.
+
+```bash
+# As root
+cp config/cdot-update.service config/cdot-update.timer /lib/systemd/system
+systemctl daemon-reload
+systemctl enable --now cdot-update.timer
+
+systemctl start cdot-update       # run a check now
+journalctl -u cdot-update         # logs
+```
+
+The job fails (shows in `systemctl --failed`) if a newer data release needs a newer cdot client
+(a data schema change). Upgrade cdot on the server to pick it up.
+
 To copy files onto the server first:
 
 ```bash

@@ -25,6 +25,7 @@ python3 manage.py test cdot_rest.tests.BatchTranscriptsViewTests.test_mixed_batc
 
 # Load data into Redis (requires a running Redis on localhost:6379, db 0)
 python3 manage.py import_transcript_json latest [--clear]
+python3 manage.py import_transcript_json latest --if-newer --clear   # what the cdot-update.timer runs
 python3 manage.py import_transcript_json cdot_json \
     --annotation-consortium=RefSeq --cdot-data-version=0.2.32 \
     cdot-0.2.32.refseq.GRCh38.json.gz [--clear]
@@ -65,6 +66,8 @@ CSRF-exempt, capped at `MAX_BATCH_SIZE` ids.
   per-build files, so `genome_builds` are merged (`_merge_genome_builds`), counts only count
   accessions new to Redis (idempotent re-import), and interval trees are unioned. Use `--clear`
   (`flushdb`) when upgrading releases to avoid stale accessions.
+- `--staging-db N` (latest only) loads into a spare db, sanity checks counts against live, then
+  `SWAPDB`s it live and flushes the old copy. No downtime but needs RAM for two copies.
 
 `cdot_rest/tests.py` holds all tests (SimpleTestCase + fakeredis). The OpenAPI spec
 (`cdot_rest/static/openapi.yaml`) and docs are hand-edited static files; tests guard that the

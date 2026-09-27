@@ -9,7 +9,8 @@ import tempfile
 from redis import Redis
 
 from django.conf import settings
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
+from cdot import get_data_schema_int
 from cdot.data_release import get_latest_combo_file_urls, get_latest_data_version_and_release
 from cdot.hgvs.dataproviders import LocalDataProvider
 
@@ -19,6 +20,9 @@ class Command(BaseCommand):
     VALID_ANNOTATION_CONSORTIUMS = ', '.join(["'%s" % a for a in ANNOTATION_CONSORTIUMS])
     # Genome builds to pull when running 'latest' (see issues #11, #13).
     LATEST_GENOME_BUILDS = ["GRCh37", "GRCh38", "T2T-CHM13v2.0"]
+    # A staged load must have at least this fraction of the live transcript counts before we swap
+    # it in - guards against a truncated/broken release replacing good data.
+    MIN_STAGED_COUNT_RATIO = 0.9
 
     def add_arguments(self, parser):
         subparsers = parser.add_subparsers(dest='subcommand')
@@ -29,6 +33,8 @@ class Command(BaseCommand):
         parser_file.add_argument('filename', help="cdot json.gz file")
         # No extra params - handles automatically
         parser_latest = subparsers.add_parser("latest", help="Automatically retrieve latest from cdot GitHub")
+        parser_latest.add_argument('--if-newer', action='store_true',
+                                   help="Do nothing if the latest compatible release is already loaded (for scheduled runs)")
 
         # Loading is additive/merge (genome_builds merge, counts accumulate, sets/interval trees union),
         # so upgrading to a new release on top of an old one leaves stale data behind. --clear wipes the
@@ -36,14 +42,55 @@ class Command(BaseCommand):
         for subparser in (parser_file, parser_latest):
             subparser.add_argument('--clear', action='store_true',
                                    help="Flush all existing data from Redis before loading (clean reload)")
+        # --clear leaves the site empty while loading (and half-loaded if it fails). --staging-db loads
+        # into a spare Redis db instead, then atomically swaps it with the live one (SWAPDB), so the
+        # site serves the old release until the new one is complete. Needs RAM for both copies.
+        parser_latest.add_argument('--staging-db', type=int,
+                                   help="Load into this spare Redis db then swap it live (implies a clean reload)")
 
 
     def handle(self, *args, **options):
-        r = Redis(**settings.REDIS_KWARGS)
-        if options.get("clear"):
-            logging.info("Clearing existing data from Redis (--clear)")
-            r.flushdb()
+        live_redis = Redis(**settings.REDIS_KWARGS)
         subcommand = options["subcommand"]
+        cdot_data_version = release = None
+        if subcommand == "latest":
+            cdot_data_version, release = get_latest_data_version_and_release()
+            if cdot_data_version is None:
+                raise CommandError("No data release on GitHub compatible with installed cdot client")
+            if options.get("if_newer"):
+                loaded_version = live_redis.get("cdot_data_version")
+                if loaded_version is not None and loaded_version.decode() == cdot_data_version:
+                    logging.info("cdot data release %s already loaded, nothing to do", cdot_data_version)
+                    self._check_for_incompatible_release(cdot_data_version)
+                    return
+
+        staging_db = options.get("staging_db")
+        if staging_db is not None:
+            live_db = settings.REDIS_KWARGS.get("db", 0)
+            if staging_db == live_db:
+                raise CommandError(f"--staging-db must differ from the live Redis db ({live_db})")
+            r = Redis(**{**settings.REDIS_KWARGS, "db": staging_db})
+            logging.info("Loading into staging Redis db %d", staging_db)
+            r.flushdb()
+        else:
+            r = live_redis
+            if options.get("clear"):
+                logging.info("Clearing existing data from Redis (--clear)")
+                r.flushdb()
+
+        try:
+            self._load(r, subcommand, options, cdot_data_version, release)
+        except BaseException:
+            if staging_db is not None:
+                r.flushdb()  # Don't leave a partial copy using RAM
+            raise
+
+        if staging_db is not None:
+            self._swap_staging_live(live_redis, r, live_db, staging_db)
+        if subcommand == "latest" and options.get("if_newer"):
+            self._check_for_incompatible_release(cdot_data_version)
+
+    def _load(self, r: Redis, subcommand, options, cdot_data_version, release):
         if subcommand == "cdot_json":
             annotation_consortium = options["annotation_consortium"]
             cdot_data_version = options["cdot_data_version"]
@@ -53,7 +100,6 @@ class Command(BaseCommand):
             with gzip.open(options["filename"]) as cdot_json_file:
                 self._insert_transcripts(r, cdot_data_version, annotation_consortium, cdot_json_file)
         elif subcommand == "latest":
-            cdot_data_version, release = get_latest_data_version_and_release()
             # eg 'cdot-0.2.32.ensembl.GRCh38.json.gz' -> annotation_consortium='ensembl'
             pattern = re.compile(r"cdot-\d+\.\d+\.\d+\.(ensembl|refseq)\.(.+)\.json\.gz")
 
@@ -77,6 +123,36 @@ class Command(BaseCommand):
 
             # Record which cdot data release this came from, so we can display it on the front page (issue #11)
             self._store_release(r, cdot_data_version, release)
+
+    @staticmethod
+    def _swap_staging_live(live_redis: Redis, staging_redis: Redis, live_db, staging_db):
+        """ Sanity check the staged load against what's live, then SWAPDB so it becomes live
+            atomically, and flush the old data (now in the staging db). """
+        for key in ("refseq_count", "ensembl_count"):
+            staged = int(staging_redis.get(key) or 0)
+            live = int(live_redis.get(key) or 0)
+            if staged == 0 or staged < live * Command.MIN_STAGED_COUNT_RATIO:
+                staging_redis.flushdb()
+                raise CommandError(f"Staged {key}={staged} vs live {live} - not swapping in")
+        logging.info("Swapping staging db %d with live db %d", staging_db, live_db)
+        live_redis.swapdb(live_db, staging_db)
+        staging_redis.flushdb()
+
+    @staticmethod
+    def _check_for_incompatible_release(compatible_version):
+        """ get_latest_data_version_and_release() skips releases with a different data schema, so
+            after a schema bump scheduled runs would quietly stay on old data. Fail loudly instead,
+            so the server's cdot client gets upgraded. """
+        response = requests.get("https://api.github.com/repos/SACGF/cdot/releases?per_page=100", timeout=60)
+        response.raise_for_status()
+        compatible_schema = get_data_schema_int(compatible_version)
+        for release in response.json():
+            tag_name = release["tag_name"]
+            if tag_name.startswith("data_v"):
+                data_version = tag_name.removeprefix("data_v")
+                if get_data_schema_int(data_version) > compatible_schema:
+                    raise CommandError(f"cdot data release {data_version} needs a newer cdot client "
+                                       f"(loaded {compatible_version}) - upgrade cdot on this server")
 
     @staticmethod
     def _store_release(r: Redis, cdot_data_version, release):

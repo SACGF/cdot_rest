@@ -68,6 +68,9 @@ List transcripts overlapping a genomic region (`aln_method` is `splign` for RefS
 curl https://cdotlib.org/transcripts/region/NC_000021.8/splign/36160000/36261000
 ```
 
+While a new data release is loading (every few months, around 20 minutes) all endpoints return
+`503` with a `Retry-After` header. A `404` means the accession or symbol really isn't there.
+
 ## To actually resolve HGVS, use the cdot client
 
 This API is the data layer. To convert HGVS to/from genomic coordinates, use the
